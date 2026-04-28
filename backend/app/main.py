@@ -44,7 +44,8 @@ if _frontend.is_dir():
         from fastapi.responses import FileResponse
         return FileResponse(str(_frontend / "index.html"))
 
-    app.mount("/", StaticFiles(directory=str(_frontend)), name="frontend")
+    # /static/style.css, /static/app.js — won't conflict with /{code} redirect
+    app.mount("/static", StaticFiles(directory=str(_frontend)), name="frontend")
 
 # AWS Lambda entry point
 handler = Mangum(app, lifespan="off")
