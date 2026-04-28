@@ -2,8 +2,6 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import boto3
-from boto3.dynamodb.conditions import Key
-from botocore.exceptions import ClientError
 
 from .config import settings
 
