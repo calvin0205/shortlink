@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import RedirectResponse
 from botocore.exceptions import ClientError
 
 from ..config import settings
@@ -37,8 +38,6 @@ def get_stats(code: str) -> StatsResponse:
 
 @router.get("/{code}/redirect")
 def redirect(code: str):
-    from fastapi.responses import RedirectResponse
-
     item = get_link(code)
     if not item:
         raise HTTPException(status_code=404, detail="Link not found")
