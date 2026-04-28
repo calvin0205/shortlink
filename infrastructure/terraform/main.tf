@@ -31,9 +31,14 @@ provider "aws" {
 }
 
 locals {
-  prefix   = "${var.project}-${var.environment}"
+  prefix     = "${var.project}-${var.environment}"
   has_domain = var.domain_name != ""
-  base_url = local.has_domain ? "https://${var.domain_name}" : "https://${module.frontend.cloudfront_domain}"
+  # base_url priority: explicit override > custom domain > placeholder (updated after first deploy)
+  base_url = (
+    var.base_url_override != "" ? var.base_url_override :
+    local.has_domain         ? "https://${var.domain_name}" :
+    "https://pending-cloudfront-url"
+  )
   tags = {
     Project     = var.project
     Environment = var.environment

@@ -21,3 +21,9 @@ variable "project" {
   type        = string
   default     = "shortlink"
 }
+
+variable "base_url_override" {
+  description = "Override the base URL used in short links (e.g. https://xxxxx.cloudfront.net). Leave empty on first deploy, then set after CloudFront URL is known."
+  type        = string
+  default     = ""
+}
