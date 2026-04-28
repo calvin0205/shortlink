@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from mangum import Mangum
 
@@ -21,16 +21,25 @@ app.add_middleware(
 
 app.include_router(links_router)
 
-# Serve the frontend at / when the ../frontend directory exists (local dev only).
-# Must be mounted LAST so /api/* and /{code} routes take priority.
-_frontend = Path(__file__).parent.parent.parent / "frontend"
+# index.html locations:
+#   local dev  → ../../../frontend/index.html  (relative to this file)
+#   Lambda     → ../../index.html              (copied next to app/ in the zip)
+_frontend_dir = Path(__file__).parent.parent.parent / "frontend"
+_lambda_index = Path(__file__).parent.parent / "index.html"
+
+
+@app.get("/", include_in_schema=False)
+def serve_index():
+    if _frontend_dir.is_dir():
+        return FileResponse(str(_frontend_dir / "index.html"))
+    if _lambda_index.exists():
+        return FileResponse(str(_lambda_index))
+    raise HTTPException(status_code=404, detail="index.html not found")
 
 
 @app.get("/{code}", include_in_schema=False)
 def redirect_short(code: str):
-    """Top-level redirect: GET /<code> → original URL (301)."""
-    from fastapi import HTTPException
-
+    """GET /<code> → redirect to original URL (301)."""
     item = get_link(code)
     if not item:
         raise HTTPException(status_code=404, detail="Link not found")
@@ -38,14 +47,9 @@ def redirect_short(code: str):
     return RedirectResponse(url=item["url"], status_code=301)
 
 
-if _frontend.is_dir():
-    @app.get("/", include_in_schema=False)
-    def serve_index():
-        from fastapi.responses import FileResponse
-        return FileResponse(str(_frontend / "index.html"))
-
-    # /static/style.css, /static/app.js — won't conflict with /{code} redirect
-    app.mount("/static", StaticFiles(directory=str(_frontend)), name="frontend")
+# Local dev: serve CSS/JS from /static/ (won't conflict with /{code})
+if _frontend_dir.is_dir():
+    app.mount("/static", StaticFiles(directory=str(_frontend_dir)), name="frontend")
 
 # AWS Lambda entry point
 handler = Mangum(app, lifespan="off")

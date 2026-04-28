@@ -1,10 +1,53 @@
 # ── Lambda package ────────────────────────────────────────────────────────────
+# Build a clean deployment package:
+#   1. pip install -r requirements.txt into build/
+#   2. copy app/ code into build/
+#   3. zip build/ → lambda_package.zip
+#
+# This avoids bundling .venv (which exceeds Lambda's 70 MB upload limit).
+
+locals {
+  build_dir   = "${path.module}/build"
+  backend_dir = abspath("${path.root}/../../backend")
+}
+
+resource "null_resource" "lambda_build" {
+  triggers = {
+    # Rebuild whenever requirements or any app source file changes
+    requirements = filemd5("${local.backend_dir}/requirements.txt")
+    app_code     = sha256(join(",", [
+      for f in sort(fileset("${local.backend_dir}/app", "**/*.py")) :
+      filemd5("${local.backend_dir}/app/${f}")
+    ]))
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["PowerShell", "-Command"]
+    command     = <<-EOT
+      $build   = "${local.build_dir}"
+      $backend = "${local.backend_dir}"
+      if (Test-Path $build) { Remove-Item -Recurse -Force $build }
+      New-Item -ItemType Directory -Force -Path $build | Out-Null
+      # Download Linux-compatible wheels (Lambda runs on Amazon Linux 2 x86_64).
+      # --platform and --only-binary force pip to fetch manylinux wheels even on Windows.
+      pip install -r "$backend/requirements.txt" -t $build --quiet --no-cache-dir `
+        --platform manylinux2014_x86_64 `
+        --only-binary=:all: `
+        --python-version 3.12 `
+        --implementation cp
+      Copy-Item -Recurse "$backend/app" "$build/app"
+      # Bundle index.html so Lambda can serve GET / without S3
+      Copy-Item "$backend/../frontend/index.html" "$build/index.html"
+      Write-Host "Lambda build complete."
+    EOT
+  }
+}
 
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_dir  = "${path.root}/../../backend"
+  source_dir  = local.build_dir
   output_path = "${path.module}/lambda_package.zip"
-  excludes    = ["tests", "__pycache__", "*.pyc", "requirements-dev.txt", "pytest.ini"]
+  depends_on  = [null_resource.lambda_build]
 }
 
 # ── IAM ───────────────────────────────────────────────────────────────────────

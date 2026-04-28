@@ -1,6 +1,6 @@
 output "site_url" {
   description = "Live URL of the deployed site"
-  value       = "https://${var.domain_name}"
+  value       = var.domain_name != "" ? "https://${var.domain_name}" : "https://${module.frontend.cloudfront_domain}"
 }
 
 output "api_invoke_url" {

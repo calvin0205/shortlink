@@ -48,10 +48,9 @@ resource "aws_s3_bucket_policy" "frontend" {
 # ── CloudFront distribution ────────────────────────────────────────────────────
 
 resource "aws_cloudfront_distribution" "main" {
-  enabled             = true
-  is_ipv6_enabled     = true
-  default_root_object = "index.html"
-  price_class         = "PriceClass_100"  # US, EU, Asia only (cheapest)
+  enabled         = true
+  is_ipv6_enabled = true
+  price_class     = "PriceClass_100"  # US, EU, Asia only (cheapest)
   tags                = var.tags
 
   # Origin 1 — S3 static frontend
@@ -73,20 +72,9 @@ resource "aws_cloudfront_distribution" "main" {
     }
   }
 
-  # /api/* → Lambda
+  # /static/* → S3 (CSS, JS — cached aggressively)
   ordered_cache_behavior {
-    path_pattern           = "/api/*"
-    allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
-    cached_methods         = ["GET", "HEAD"]
-    target_origin_id       = "api-gateway"
-    viewer_protocol_policy = "redirect-to-https"
-    cache_policy_id        = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"  # CachingDisabled (built-in)
-    origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac"  # AllViewerExceptHostHeader
-    compress               = true
-  }
-
-  # /* → S3 (SPA catch-all)
-  default_cache_behavior {
+    path_pattern           = "/static/*"
     allowed_methods        = ["GET", "HEAD"]
     cached_methods         = ["GET", "HEAD"]
     target_origin_id       = "s3-frontend"
@@ -95,29 +83,41 @@ resource "aws_cloudfront_distribution" "main" {
     compress               = true
   }
 
-  # Return index.html for any 403/404 so the SPA can handle routing
-  custom_error_response {
-    error_code            = 403
-    response_code         = 200
-    response_page_path    = "/index.html"
-    error_caching_min_ttl = 0
+  # /api/* → Lambda (API calls, no cache)
+  ordered_cache_behavior {
+    path_pattern             = "/api/*"
+    allowed_methods          = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods           = ["GET", "HEAD"]
+    target_origin_id         = "api-gateway"
+    viewer_protocol_policy   = "redirect-to-https"
+    cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"  # CachingDisabled (built-in)
+    origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac"  # AllViewerExceptHostHeader
+    compress                 = true
   }
-  custom_error_response {
-    error_code            = 404
-    response_code         = 200
-    response_page_path    = "/index.html"
-    error_caching_min_ttl = 0
+
+  # /* → Lambda (handles GET / and GET /{code} redirects)
+  default_cache_behavior {
+    allowed_methods          = ["GET", "HEAD"]
+    cached_methods           = ["GET", "HEAD"]
+    target_origin_id         = "api-gateway"
+    viewer_protocol_policy   = "redirect-to-https"
+    cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"  # CachingDisabled
+    origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac"  # AllViewerExceptHostHeader
+    compress                 = true
   }
 
   restrictions {
     geo_restriction { restriction_type = "none" }
   }
 
-  viewer_certificate {
-    acm_certificate_arn      = var.acm_certificate_arn
-    ssl_support_method       = "sni-only"
-    minimum_protocol_version = "TLSv1.2_2021"
+  # Use custom ACM cert when a domain is provided, otherwise use the default
+  # CloudFront certificate (*.cloudfront.net — HTTPS still works, just uglier URL)
+  dynamic "viewer_certificate" {
+    for_each = var.domain_name != "" ? [] : [1]
+    content {
+      cloudfront_default_certificate = true
+    }
   }
 
-  aliases = [var.domain_name]
+  aliases = var.domain_name != "" ? [var.domain_name] : []
 }

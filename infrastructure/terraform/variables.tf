@@ -5,8 +5,9 @@ variable "aws_region" {
 }
 
 variable "domain_name" {
-  description = "Your root domain (e.g. shortlink.example.com). Must already have a hosted zone in Route53."
+  description = "Custom domain (e.g. shortlink.example.com). Leave empty to use the auto-generated CloudFront URL."
   type        = string
+  default     = ""
 }
 
 variable "environment" {
@@ -19,4 +20,10 @@ variable "project" {
   description = "Project name — used as a prefix on all resource names"
   type        = string
   default     = "shortlink"
+}
+
+variable "base_url_override" {
+  description = "Override the base URL used in short links (e.g. https://xxxxx.cloudfront.net). Leave empty on first deploy, then set after CloudFront URL is known."
+  type        = string
+  default     = ""
 }
