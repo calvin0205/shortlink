@@ -1,5 +1,5 @@
 const API_BASE = window.location.hostname === "localhost"
-  ? "http://localhost:8000"
+  ? "https://localhost:8000"
   : "";  // same origin in production (CloudFront routes /api/* to Lambda)
 
 // ── Shorten form ─────────────────────────────────────────────────────────────
