@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     aws_region: str = "ap-northeast-1"
     base_url: str = "https://localhost:8000"
     code_length: int = 7
+    dynamodb_endpoint_url: str | None = None  # set to http://localhost:8000 for DynamoDB Local
 
     class Config:
         env_file = ".env"

@@ -9,7 +9,13 @@ from .config import settings
 
 
 def _table():
-    dynamo = boto3.resource("dynamodb", region_name=settings.aws_region)
+    kwargs = {"region_name": settings.aws_region}
+    if settings.dynamodb_endpoint_url:
+        # DynamoDB Local — no real credentials needed
+        kwargs["endpoint_url"] = settings.dynamodb_endpoint_url
+        kwargs["aws_access_key_id"] = "local"
+        kwargs["aws_secret_access_key"] = "local"
+    dynamo = boto3.resource("dynamodb", **kwargs)
     return dynamo.Table(settings.dynamodb_table)
 
 
