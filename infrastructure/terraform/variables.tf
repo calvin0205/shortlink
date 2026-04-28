@@ -5,8 +5,9 @@ variable "aws_region" {
 }
 
 variable "domain_name" {
-  description = "Your root domain (e.g. shortlink.example.com). Must already have a hosted zone in Route53."
+  description = "Custom domain (e.g. shortlink.example.com). Leave empty to use the auto-generated CloudFront URL."
   type        = string
+  default     = ""
 }
 
 variable "environment" {

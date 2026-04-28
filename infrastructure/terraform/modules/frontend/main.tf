@@ -113,11 +113,14 @@ resource "aws_cloudfront_distribution" "main" {
     geo_restriction { restriction_type = "none" }
   }
 
-  viewer_certificate {
-    acm_certificate_arn      = var.acm_certificate_arn
-    ssl_support_method       = "sni-only"
-    minimum_protocol_version = "TLSv1.2_2021"
+  # Use custom ACM cert when a domain is provided, otherwise use the default
+  # CloudFront certificate (*.cloudfront.net — HTTPS still works, just uglier URL)
+  dynamic "viewer_certificate" {
+    for_each = var.domain_name != "" ? [] : [1]
+    content {
+      cloudfront_default_certificate = true
+    }
   }
 
-  aliases = [var.domain_name]
+  aliases = var.domain_name != "" ? [var.domain_name] : []
 }
