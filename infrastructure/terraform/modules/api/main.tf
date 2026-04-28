@@ -36,6 +36,8 @@ resource "null_resource" "lambda_build" {
         --python-version 3.12 `
         --implementation cp
       Copy-Item -Recurse "$backend/app" "$build/app"
+      # Bundle index.html so Lambda can serve GET / without S3
+      Copy-Item "$backend/../frontend/index.html" "$build/index.html"
       Write-Host "Lambda build complete."
     EOT
   }
