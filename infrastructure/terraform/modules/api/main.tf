@@ -28,7 +28,13 @@ resource "null_resource" "lambda_build" {
       $backend = "${local.backend_dir}"
       if (Test-Path $build) { Remove-Item -Recurse -Force $build }
       New-Item -ItemType Directory -Force -Path $build | Out-Null
-      pip install -r "$backend/requirements.txt" -t $build --quiet --no-cache-dir
+      # Download Linux-compatible wheels (Lambda runs on Amazon Linux 2 x86_64).
+      # --platform and --only-binary force pip to fetch manylinux wheels even on Windows.
+      pip install -r "$backend/requirements.txt" -t $build --quiet --no-cache-dir `
+        --platform manylinux2014_x86_64 `
+        --only-binary=:all: `
+        --python-version 3.12 `
+        --implementation cp
       Copy-Item -Recurse "$backend/app" "$build/app"
       Write-Host "Lambda build complete."
     EOT
