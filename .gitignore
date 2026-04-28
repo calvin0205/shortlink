@@ -1,0 +1,40 @@
+node_modules/
+coverage/
+.env
+.env.local
+.env.*.local
+npm-debug.log*
+
+# Build / runtime
+dist/
+.tmp/
+
+# Editor
+.vscode/
+.idea/
+
+# Docker artifacts
+docker/certs/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars.local
+*.tfplan
+crash.log
+infrastructure/terraform/modules/api/lambda_package.zip
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+backend/.venv/
+backend/venv/
+
+# OS
+.DS_Store
+Thumbs.db
