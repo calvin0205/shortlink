@@ -1,6 +1,9 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from mangum import Mangum
 
 from .config import settings
@@ -18,6 +21,10 @@ app.add_middleware(
 
 app.include_router(links_router)
 
+# Serve the frontend at / when the ../frontend directory exists (local dev only).
+# Must be mounted LAST so /api/* and /{code} routes take priority.
+_frontend = Path(__file__).parent.parent.parent / "frontend"
+
 
 @app.get("/{code}", include_in_schema=False)
 def redirect_short(code: str):
@@ -30,6 +37,14 @@ def redirect_short(code: str):
     increment_hits(code)
     return RedirectResponse(url=item["url"], status_code=301)
 
+
+if _frontend.is_dir():
+    @app.get("/", include_in_schema=False)
+    def serve_index():
+        from fastapi.responses import FileResponse
+        return FileResponse(str(_frontend / "index.html"))
+
+    app.mount("/", StaticFiles(directory=str(_frontend)), name="frontend")
 
 # AWS Lambda entry point
 handler = Mangum(app, lifespan="off")
