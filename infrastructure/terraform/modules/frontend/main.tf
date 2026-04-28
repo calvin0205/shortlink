@@ -48,10 +48,9 @@ resource "aws_s3_bucket_policy" "frontend" {
 # ── CloudFront distribution ────────────────────────────────────────────────────
 
 resource "aws_cloudfront_distribution" "main" {
-  enabled             = true
-  is_ipv6_enabled     = true
-  default_root_object = "index.html"
-  price_class         = "PriceClass_100"  # US, EU, Asia only (cheapest)
+  enabled         = true
+  is_ipv6_enabled = true
+  price_class     = "PriceClass_100"  # US, EU, Asia only (cheapest)
   tags                = var.tags
 
   # Origin 1 — S3 static frontend
