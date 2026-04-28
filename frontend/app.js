@@ -1,6 +1,4 @@
-const API_BASE = ["localhost", "shortlink.local"].includes(window.location.hostname)
-  ? `${window.location.protocol}//${window.location.hostname}:8000`
-  : "";  // same origin in production (CloudFront routes /api/* to Lambda)
+const API_BASE = "";  // always same origin (dev: shortlink:443, prod: CloudFront)
 
 // ── Shorten form ─────────────────────────────────────────────────────────────
 

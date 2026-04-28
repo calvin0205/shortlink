@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     app_name: str = "shortlink"
     dynamodb_table: str = "shortlink-links"
     aws_region: str = "ap-northeast-1"
-    base_url: str = "https://shortlink.local:8000"
+    base_url: str = "https://shortlink"
     code_length: int = 7
     dynamodb_endpoint_url: str | None = None  # set to http://localhost:8000 for DynamoDB Local
 

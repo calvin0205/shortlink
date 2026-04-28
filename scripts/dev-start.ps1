@@ -5,7 +5,7 @@ $ErrorActionPreference = "Stop"
 
 $TABLE      = "shortlink-links"
 $DYNAMO_PORT = 8001
-$API_PORT    = 8000
+$API_PORT    = 443   # standard HTTPS port — requires running as Administrator
 $ROOT        = Split-Path $PSScriptRoot -Parent
 
 Set-Location $ROOT
@@ -48,8 +48,8 @@ $certFile = "$ROOT\backend\certs\cert.pem"
 Set-Location "$ROOT\backend"
 
 if ((Test-Path $certKey) -and (Test-Path $certFile)) {
-    Write-Host "-> Starting HTTPS server at https://localhost:$API_PORT" -ForegroundColor Green
-    Write-Host "   API docs: https://localhost:$API_PORT/api/docs`n"
+    Write-Host "-> Starting HTTPS server at https://shortlink" -ForegroundColor Green
+    Write-Host "   API docs: https://shortlink/api/docs`n"
     uvicorn app.main:app --reload --port $API_PORT `
         --ssl-keyfile "certs\key.pem" `
         --ssl-certfile "certs\cert.pem"
