@@ -26,23 +26,8 @@ if ($existing -eq "shortlink-dynamo") {
     Start-Sleep -Seconds 2
 }
 
-# ── 2. Create table ───────────────────────────────────────────────────────────
-Write-Host "-> Creating DynamoDB table '$TABLE'..." -ForegroundColor Cyan
-try {
-    aws dynamodb create-table `
-        --endpoint-url "http://localhost:$DYNAMO_PORT" `
-        --table-name $TABLE `
-        --attribute-definitions AttributeName=code,AttributeType=S `
-        --key-schema AttributeName=code,KeyType=HASH `
-        --billing-mode PAY_PER_REQUEST `
-        --region ap-northeast-1 `
-        --no-cli-pager 2>&1 | Out-Null
-    Write-Host "   Table created."
-} catch {
-    Write-Host "   Table already exists, skipping."
-}
-
-# ── 3. Activate venv ──────────────────────────────────────────────────────────
+# ── 2. Activate venv ─────────────────────────────────────────────────────────
+# (needed before step 3 so Python/boto3 is available)
 $venvActivate = "$ROOT\backend\.venv\Scripts\Activate.ps1"
 if (Test-Path $venvActivate) {
     Write-Host "-> Activating virtual environment..." -ForegroundColor Cyan
@@ -50,6 +35,10 @@ if (Test-Path $venvActivate) {
 } else {
     Write-Host "WARNING: .venv not found. Run: cd backend; python -m venv .venv; .venv\Scripts\activate; pip install -r requirements-dev.txt" -ForegroundColor Yellow
 }
+
+# ── 3. Create DynamoDB table (uses Python/boto3, no AWS CLI needed) ───────────
+Write-Host "-> Creating DynamoDB table '$TABLE'..." -ForegroundColor Cyan
+python "$ROOT\scripts\create-table.py"
 
 # ── 4. Start uvicorn ──────────────────────────────────────────────────────────
 $env:DYNAMODB_ENDPOINT_URL = "http://localhost:$DYNAMO_PORT"
