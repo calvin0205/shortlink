@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — OT Sentinel</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <span>🛡️</span> OT Sentinel
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/dashboard.html" class="nav-item active">
+          <span class="nav-icon">📊</span> Dashboard
+        </a>
+        <a href="/devices.html" class="nav-item">
+          <span class="nav-icon">🖥️</span> Devices
+        </a>
+        <a href="/incidents.html" class="nav-item">
+          <span class="nav-icon">⚠️</span> Incidents
+        </a>
+        <a href="/ai-assistant.html" class="nav-item">
+          <span class="nav-icon">🤖</span> AI Assistant
+        </a>
+        <a href="/admin.html" class="nav-item">
+          <span class="nav-icon">👤</span> Admin
+        </a>
+        <a href="/audit-log.html" class="nav-item">
+          <span class="nav-icon">📋</span> Audit Log
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <button onclick="logout()" class="btn btn-ghost" style="width:100%">
+          🚪 Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main-content">
+      <header class="header">
+        <h2>Dashboard</h2>
+        <div class="user-info">
+          <span id="header-user"></span>
+          <span id="header-role" class="badge badge-admin" style="margin-left:8px"></span>
+        </div>
+      </header>
+      <div class="page-content">
+
+        <!-- Stats Grid -->
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card">
+            <div class="stat-card-header">
+              <span class="stat-label">Total Devices</span>
+              <span class="stat-icon">🖥️</span>
+            </div>
+            <div class="stat-value" id="stat-total-devices">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-header">
+              <span class="stat-label">Active Incidents</span>
+              <span class="stat-icon">⚠️</span>
+            </div>
+            <div class="stat-value" id="stat-active-incidents" style="color:var(--warning)">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-header">
+              <span class="stat-label">Critical Alerts</span>
+              <span class="stat-icon">🔴</span>
+            </div>
+            <div class="stat-value" id="stat-critical-incidents" style="color:var(--danger)">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-header">
+              <span class="stat-label">Avg Risk Score</span>
+              <span class="stat-icon">📈</span>
+            </div>
+            <div class="stat-value" id="stat-avg-risk" style="color:var(--accent-secondary)">—</div>
+          </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-row">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Device Status</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="chart-device-status"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Incidents by Severity</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="chart-incidents-severity"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Incidents -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Recent Active Incidents</span>
+            <a href="/incidents.html" class="btn btn-ghost" style="font-size:0.8rem">View All →</a>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Device</th>
+                  <th>Severity</th>
+                  <th>Status</th>
+                  <th>Title</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody id="recent-incidents-body">
+                <tr><td colspan="6"><div class="empty-state"><div class="empty-state-icon">⏳</div>Loading…</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="/static/app.js"></script>
+  <script src="/static/dashboard.js"></script>
+</body>
+</html>

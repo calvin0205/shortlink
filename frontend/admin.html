@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — OT Sentinel</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <span>🛡️</span> OT Sentinel
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/dashboard.html" class="nav-item">
+          <span class="nav-icon">📊</span> Dashboard
+        </a>
+        <a href="/devices.html" class="nav-item">
+          <span class="nav-icon">🖥️</span> Devices
+        </a>
+        <a href="/incidents.html" class="nav-item">
+          <span class="nav-icon">⚠️</span> Incidents
+        </a>
+        <a href="/ai-assistant.html" class="nav-item">
+          <span class="nav-icon">🤖</span> AI Assistant
+        </a>
+        <a href="/admin.html" class="nav-item active">
+          <span class="nav-icon">👤</span> Admin
+        </a>
+        <a href="/audit-log.html" class="nav-item">
+          <span class="nav-icon">📋</span> Audit Log
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <button onclick="logout()" class="btn btn-ghost" style="width:100%">
+          🚪 Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main-content">
+      <header class="header">
+        <h2>Admin</h2>
+        <div class="user-info">
+          <span id="header-user"></span>
+          <span id="header-role" class="badge badge-admin" style="margin-left:8px"></span>
+        </div>
+      </header>
+      <div class="page-content">
+
+        <!-- Current User Card -->
+        <div class="card" style="max-width:480px">
+          <div class="card-header">
+            <span class="card-title">Your Account</span>
+          </div>
+          <div class="info-card" id="user-info-card">
+            <div class="info-row">
+              <span class="info-row-label">Name</span>
+              <span class="info-row-value" id="admin-name">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-row-label">Email</span>
+              <span class="info-row-value" id="admin-email">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-row-label">Role</span>
+              <span class="info-row-value" id="admin-role">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-row-label">User ID</span>
+              <span class="info-row-value font-mono text-secondary" id="admin-id">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Platform Info Card -->
+        <div class="card" style="max-width:480px">
+          <div class="card-header">
+            <span class="card-title">Platform Overview</span>
+          </div>
+          <div class="info-card" id="platform-info">
+            <div class="info-row">
+              <span class="info-row-label">Platform</span>
+              <span class="info-row-value">OT Sentinel</span>
+            </div>
+            <div class="info-row">
+              <span class="info-row-label">Phase</span>
+              <span class="info-row-value"><span class="badge badge-admin">Phase 1 — Demo</span></span>
+            </div>
+            <div class="info-row">
+              <span class="info-row-label">Total Devices</span>
+              <span class="info-row-value" id="platform-devices">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-row-label">Active Incidents</span>
+              <span class="info-row-value" id="platform-incidents">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-row-label">Avg Risk Score</span>
+              <span class="info-row-value" id="platform-risk">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Future Features -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">User Management</span>
+            <span class="badge badge-medium">Phase 2</span>
+          </div>
+          <div class="empty-state" style="padding:32px">
+            <div class="empty-state-icon">👥</div>
+            <div style="font-weight:600;color:var(--text-primary)">User Management — Coming in Phase 2</div>
+            <div class="text-sm text-secondary" style="max-width:360px;text-align:center">
+              Phase 2 will add user invite flows, role management, password reset,
+              and multi-tenant site access control.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script src="/static/admin.js"></script>
+</body>
+</html>

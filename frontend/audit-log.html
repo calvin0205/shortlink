@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audit Log — OT Sentinel</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <span>🛡️</span> OT Sentinel
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/dashboard.html" class="nav-item">
+          <span class="nav-icon">📊</span> Dashboard
+        </a>
+        <a href="/devices.html" class="nav-item">
+          <span class="nav-icon">🖥️</span> Devices
+        </a>
+        <a href="/incidents.html" class="nav-item">
+          <span class="nav-icon">⚠️</span> Incidents
+        </a>
+        <a href="/ai-assistant.html" class="nav-item">
+          <span class="nav-icon">🤖</span> AI Assistant
+        </a>
+        <a href="/admin.html" class="nav-item">
+          <span class="nav-icon">👤</span> Admin
+        </a>
+        <a href="/audit-log.html" class="nav-item active">
+          <span class="nav-icon">📋</span> Audit Log
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <button onclick="logout()" class="btn btn-ghost" style="width:100%">
+          🚪 Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main-content">
+      <header class="header">
+        <h2>Audit Log</h2>
+        <div class="user-info">
+          <span id="header-user"></span>
+          <span id="header-role" class="badge badge-admin" style="margin-left:8px"></span>
+        </div>
+      </header>
+      <div class="page-content">
+
+        <div class="card" id="audit-card">
+          <div class="card-header">
+            <span class="card-title">Activity Log</span>
+            <span class="badge badge-admin" style="font-size:0.7rem">Admin Only</span>
+          </div>
+
+          <div id="audit-access-denied" style="display:none">
+            <div class="empty-state">
+              <div class="empty-state-icon">🔒</div>
+              <div style="font-weight:600;color:var(--text-primary)">Access Restricted</div>
+              <div class="text-sm text-secondary">The audit log is only accessible to admin users.</div>
+            </div>
+          </div>
+
+          <div id="audit-table-wrapper" class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>User</th>
+                  <th>Action</th>
+                  <th>Resource Type</th>
+                  <th>Resource ID</th>
+                  <th>Detail</th>
+                  <th>IP Address</th>
+                </tr>
+              </thead>
+              <tbody id="audit-body">
+                <tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">⏳</div>Loading audit log…</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script src="/static/audit-log.js"></script>
+</body>
+</html>

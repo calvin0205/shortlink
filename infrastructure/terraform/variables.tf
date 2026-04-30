@@ -5,7 +5,7 @@ variable "aws_region" {
 }
 
 variable "domain_name" {
-  description = "Custom domain (e.g. shortlink.example.com). Leave empty to use the auto-generated CloudFront URL."
+  description = "Custom domain (e.g. otsentinel.example.com). Leave empty to use the auto-generated CloudFront URL."
   type        = string
   default     = ""
 }
@@ -19,11 +19,18 @@ variable "environment" {
 variable "project" {
   description = "Project name — used as a prefix on all resource names"
   type        = string
-  default     = "shortlink"
+  default     = "otsentinel"
 }
 
 variable "base_url_override" {
-  description = "Override the base URL used in short links (e.g. https://xxxxx.cloudfront.net). Leave empty on first deploy, then set after CloudFront URL is known."
+  description = "Override the base URL (e.g. https://xxxxx.cloudfront.net). Leave empty on first deploy."
   type        = string
   default     = ""
+}
+
+variable "jwt_secret" {
+  description = "JWT signing secret for authentication"
+  type        = string
+  default     = "dev-secret-change-in-prod"
+  sensitive   = true
 }
