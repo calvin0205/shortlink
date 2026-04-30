@@ -13,7 +13,43 @@ from .routes import simulate as simulate_router
 from .routes import admin as admin_router
 from .routes import assistant as assistant_router
 
-app = FastAPI(title=settings.app_name, version="1.0.0", docs_url="/api/docs")
+app = FastAPI(
+    title="OT Sentinel",
+    version="1.0.0",
+    description="""
+## OT/IoT Security Monitoring Platform
+
+OT Sentinel is a serverless security monitoring platform for Operational Technology (OT) and IoT devices in industrial environments.
+
+### Features
+- 🔐 **JWT Authentication** with role-based access control (Admin / Operator)
+- 🖥️ **Device Inventory** with real-time status monitoring
+- ⚠️ **Incident Management** with severity-based risk scoring
+- ⚡ **Anomaly Simulation** — trigger security events for demo/testing
+- 🤖 **AI Assistant** with OT/ICS security knowledge base
+- 📋 **Audit Logging** for compliance and forensics
+
+### Architecture
+- **Compute**: AWS Lambda (Python 3.12 + FastAPI + Mangum)
+- **Database**: DynamoDB with GSI for efficient queries
+- **CDN**: CloudFront (HTTPS, cache optimization)
+- **Frontend**: Vanilla HTML/CSS/JS served via Lambda
+
+### Authentication
+All endpoints (except health check) require a Bearer token obtained from `POST /api/auth/login`.
+""",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_tags=[
+        {"name": "auth", "description": "Authentication and user management"},
+        {"name": "devices", "description": "OT/IoT device inventory and status"},
+        {"name": "incidents", "description": "Security incident management and lifecycle"},
+        {"name": "dashboard", "description": "Summary statistics and overview"},
+        {"name": "assistant", "description": "AI-powered security analysis"},
+        {"name": "audit", "description": "Audit log for compliance and forensics"},
+        {"name": "admin", "description": "Admin-only operations (requires admin role)"},
+    ]
+)
 
 app.add_middleware(
     CORSMiddleware,

@@ -9,6 +9,7 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 @router.get("/summary")
 async def get_summary(current_user=Depends(get_current_user)):
+    """Get dashboard summary statistics including device counts, incident counts, and recent incidents."""
     devices = list_devices()
     incidents = list_incidents()
 

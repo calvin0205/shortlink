@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/devices", tags=["simulate"])
 
 @router.get("/anomaly-types")
 async def list_anomaly_types(current_user=Depends(get_current_user)):
-    """Return available anomaly types for the frontend dropdown."""
+    """Get list of available anomaly types for simulation."""
     return get_anomaly_types()
 
 
@@ -26,6 +26,7 @@ async def simulate_anomaly(
     request: Request,
     current_user=Depends(get_current_user),
 ):
+    """Simulate a security anomaly on a device. Calculates risk score, creates an incident, updates device status, and writes audit log."""
     # 1. Get device (404 if not found)
     device = get_device(device_id)
     if not device:

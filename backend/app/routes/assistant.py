@@ -15,6 +15,7 @@ async def query_assistant(
     request: Request,
     current_user: dict = Depends(get_current_user),
 ):
+    """Query the AI assistant with a security question. Optionally provide an incident_id for context-aware analysis. Supports both rule-based and LLM (Claude API) response modes."""
     # Optionally fetch incident context
     incident = None
     if body.incident_id:
@@ -42,7 +43,7 @@ async def query_assistant(
 
 @router.get("/suggested-queries")
 async def get_suggested_queries(current_user: dict = Depends(get_current_user)):
-    """Return suggested queries for the frontend."""
+    """Get a list of suggested questions to ask the AI assistant."""
     return {
         "queries": [
             "What should I do about an unauthorized access attempt on a PLC?",

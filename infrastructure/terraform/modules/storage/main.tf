@@ -3,7 +3,9 @@ resource "aws_dynamodb_table" "users" {
   name         = "${var.prefix}-users"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "PK"
-  tags         = var.tags
+  tags = merge(var.tags, {
+    Description = "OT Sentinel users table with email GSI"
+  })
 
   attribute { name = "PK";    type = "S" }
   attribute { name = "email"; type = "S" }
@@ -20,7 +22,9 @@ resource "aws_dynamodb_table" "devices" {
   name         = "${var.prefix}-devices"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "PK"
-  tags         = var.tags
+  tags = merge(var.tags, {
+    Description = "OT Sentinel devices table with status-index and site-index GSIs"
+  })
 
   attribute { name = "PK";       type = "S" }
   attribute { name = "status";   type = "S" }
@@ -47,7 +51,9 @@ resource "aws_dynamodb_table" "incidents" {
   name         = "${var.prefix}-incidents"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "PK"
-  tags         = var.tags
+  tags = merge(var.tags, {
+    Description = "OT Sentinel incidents table with device-index and severity-index GSIs"
+  })
 
   attribute { name = "PK";         type = "S" }
   attribute { name = "device_id";  type = "S" }
@@ -74,7 +80,9 @@ resource "aws_dynamodb_table" "audit" {
   name         = "${var.prefix}-audit"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "PK"
-  tags         = var.tags
+  tags = merge(var.tags, {
+    Description = "OT Sentinel audit log table with user-index GSI"
+  })
 
   attribute { name = "PK";        type = "S" }
   attribute { name = "user_id";   type = "S" }
