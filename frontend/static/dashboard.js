@@ -161,3 +161,6 @@ function renderCharts(summary) {
 
 // Load on page ready
 loadDashboard();
+
+// Auto-refresh every 30 seconds
+setInterval(loadDashboard, 30000);

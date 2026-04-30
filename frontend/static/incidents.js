@@ -56,7 +56,16 @@ function renderIncidents(filter) {
 
   tbody.innerHTML = sorted
     .map(
-      (inc) => `
+      (inc) => {
+        const status = (inc.status || "").toLowerCase();
+        const actions = [];
+        if (status === "open") {
+          actions.push(`<button onclick="acknowledgeIncident('${inc.incident_id}')" class="btn btn-ghost" style="font-size:0.75rem;padding:4px 8px">✔ Acknowledge</button>`);
+        }
+        if (status !== "resolved") {
+          actions.push(`<button onclick="resolveIncident('${inc.incident_id}')" class="btn btn-ghost" style="font-size:0.75rem;padding:4px 8px;color:var(--success)">✅ Resolve</button>`);
+        }
+        return `
     <tr>
       <td><span class="font-mono text-secondary">${shortId(inc.incident_id)}</span></td>
       <td>${inc.device_name || "—"}</td>
@@ -67,9 +76,39 @@ function renderIncidents(filter) {
       </td>
       <td>${riskBar(inc.risk_score)}</td>
       <td class="text-secondary">${timeAgo(inc.created_at)}</td>
-    </tr>`
+      <td style="white-space:nowrap">${actions.join(" ")}</td>
+    </tr>`;
+      }
     )
     .join("");
+}
+
+// ── Incident actions ──────────────────────────────────────────────────────────
+
+async function acknowledgeIncident(incidentId) {
+  try {
+    await apiFetch(`/api/incidents/${incidentId}/acknowledge`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    showToast("Incident acknowledged", "success");
+    await loadIncidents();
+  } catch (err) {
+    showToast("Failed to acknowledge: " + err.message, "error");
+  }
+}
+
+async function resolveIncident(incidentId) {
+  try {
+    await apiFetch(`/api/incidents/${incidentId}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    showToast("Incident resolved", "success");
+    await loadIncidents();
+  } catch (err) {
+    showToast("Failed to resolve: " + err.message, "error");
+  }
 }
 
 // Filter button click handlers
