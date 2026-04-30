@@ -1,48 +1,40 @@
-"""Unit tests for the code-generation logic (no AWS needed)."""
-import string
-
+"""Unit tests for auth utilities (no AWS needed)."""
 import pytest
 
-from app.shortener import generate_code, is_valid_url
-
-VALID_CHARS = set(string.ascii_letters + string.digits)
-
-
-class TestGenerateCode:
-    def test_default_length(self):
-        assert len(generate_code()) == 7
-
-    def test_custom_length(self):
-        assert len(generate_code(length=12)) == 12
-
-    def test_only_alphanumeric(self):
-        for _ in range(200):
-            code = generate_code()
-            assert set(code).issubset(VALID_CHARS), f"Non-alphanumeric char in {code!r}"
-
-    def test_randomness(self):
-        # Probability of collision in 1000 draws from 62^7 space ≈ 0
-        codes = {generate_code() for _ in range(1000)}
-        assert len(codes) > 990
-
-    def test_minimum_length_one(self):
-        assert len(generate_code(length=1)) == 1
+from app.auth import hash_password, verify_password, create_access_token, decode_token
+from fastapi import HTTPException
 
 
-class TestIsValidUrl:
-    @pytest.mark.parametrize("url", [
-        "https://example.com",
-        "http://example.com/path?q=1",
-        "https://sub.domain.io:8080/a/b",
-    ])
-    def test_valid_urls(self, url):
-        assert is_valid_url(url) is True
+class TestPasswordHashing:
+    def test_hash_and_verify(self):
+        hashed = hash_password("MyPassword123!")
+        assert verify_password("MyPassword123!", hashed) is True
 
-    @pytest.mark.parametrize("url", [
-        "ftp://example.com",
-        "example.com",
-        "",
-        "javascript:alert(1)",
-    ])
-    def test_invalid_urls(self, url):
-        assert is_valid_url(url) is False
+    def test_wrong_password_fails_verify(self):
+        hashed = hash_password("correct-password")
+        assert verify_password("wrong-password", hashed) is False
+
+    def test_hash_is_not_plaintext(self):
+        hashed = hash_password("plaintext")
+        assert hashed != "plaintext"
+        assert len(hashed) > 20
+
+
+class TestJWT:
+    def test_create_and_decode_token(self):
+        token = create_access_token({"sub": "user-123", "email": "test@example.com"})
+        payload = decode_token(token)
+        assert payload["sub"] == "user-123"
+        assert payload["email"] == "test@example.com"
+
+    def test_invalid_token_raises_401(self):
+        with pytest.raises(HTTPException) as exc_info:
+            decode_token("this.is.not.a.valid.token")
+        assert exc_info.value.status_code == 401
+
+    def test_tampered_token_raises_401(self):
+        token = create_access_token({"sub": "user-123"})
+        tampered = token[:-5] + "xxxxx"
+        with pytest.raises(HTTPException) as exc_info:
+            decode_token(tampered)
+        assert exc_info.value.status_code == 401

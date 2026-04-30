@@ -1,35 +1,93 @@
-"""Unit tests for Pydantic request/response models."""
+"""Unit tests for Pydantic models."""
 import pytest
 from pydantic import ValidationError
 
-from app.models import CreateLinkRequest
+from app.models.auth import LoginRequest, TokenResponse
+from app.models.device import DeviceResponse
+from app.models.incident import IncidentResponse
+from app.models.audit import AuditLogResponse
 
 
-class TestCreateLinkRequest:
-    def test_valid_http_url(self):
-        req = CreateLinkRequest(url="https://example.com")
-        assert str(req.url) == "https://example.com/"
+class TestLoginRequest:
+    def test_valid_login_request(self):
+        req = LoginRequest(email="user@example.com", password="secret123")
+        assert req.email == "user@example.com"
+        assert req.password == "secret123"
 
-    def test_rejects_non_url(self):
+    def test_missing_email_raises(self):
         with pytest.raises(ValidationError):
-            CreateLinkRequest(url="not-a-url")
+            LoginRequest(password="secret123")
 
-    def test_custom_code_alphanumeric(self):
-        req = CreateLinkRequest(url="https://example.com", custom_code="abc123")
-        assert req.custom_code == "abc123"
-
-    def test_custom_code_too_short(self):
+    def test_missing_password_raises(self):
         with pytest.raises(ValidationError):
-            CreateLinkRequest(url="https://example.com", custom_code="ab")
+            LoginRequest(email="user@example.com")
 
-    def test_custom_code_too_long(self):
-        with pytest.raises(ValidationError):
-            CreateLinkRequest(url="https://example.com", custom_code="a" * 21)
 
-    def test_custom_code_special_chars(self):
-        with pytest.raises(ValidationError):
-            CreateLinkRequest(url="https://example.com", custom_code="bad-code")
+class TestTokenResponse:
+    def test_defaults_to_bearer(self):
+        resp = TokenResponse(access_token="tok123", user={"user_id": "u1"})
+        assert resp.token_type == "bearer"
 
-    def test_no_custom_code_is_fine(self):
-        req = CreateLinkRequest(url="https://example.com")
-        assert req.custom_code is None
+
+class TestDeviceResponse:
+    def test_valid_device(self):
+        device = DeviceResponse(
+            device_id="d1",
+            name="PLC-001",
+            type="PLC",
+            site_id="site-a",
+            site_name="Site Alpha",
+            status="online",
+            ip_address="192.168.10.1",
+            firmware_version="v2.1.0",
+            last_seen="2026-04-30T00:00:00Z",
+            risk_score=15,
+        )
+        assert device.device_id == "d1"
+        assert device.risk_score == 15
+
+    def test_risk_score_defaults_to_zero(self):
+        device = DeviceResponse(
+            device_id="d1",
+            name="PLC-001",
+            type="PLC",
+            site_id="site-a",
+            site_name="Site Alpha",
+            status="online",
+            ip_address="192.168.10.1",
+            firmware_version="v2.1.0",
+            last_seen="2026-04-30T00:00:00Z",
+        )
+        assert device.risk_score == 0
+
+
+class TestIncidentResponse:
+    def test_valid_incident(self):
+        incident = IncidentResponse(
+            incident_id="i1",
+            device_id="d1",
+            device_name="PLC-001",
+            severity="critical",
+            status="open",
+            title="Unauthorized access attempt",
+            description="Multiple failed login attempts detected",
+            risk_score=85,
+            created_at="2026-04-30T00:00:00Z",
+        )
+        assert incident.incident_id == "i1"
+        assert incident.resolved_at is None
+
+    def test_optional_resolved_at(self):
+        incident = IncidentResponse(
+            incident_id="i1",
+            device_id="d1",
+            device_name="PLC-001",
+            severity="low",
+            status="resolved",
+            title="Minor alert",
+            description="Resolved alert",
+            risk_score=10,
+            created_at="2026-04-30T00:00:00Z",
+            resolved_at="2026-04-30T01:00:00Z",
+        )
+        assert incident.resolved_at == "2026-04-30T01:00:00Z"

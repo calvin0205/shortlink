@@ -36,8 +36,14 @@ resource "null_resource" "lambda_build" {
         --python-version 3.12 `
         --implementation cp
       Copy-Item -Recurse "$backend/app" "$build/app"
-      # Bundle index.html so Lambda can serve GET / without S3
-      Copy-Item "$backend/../frontend/index.html" "$build/index.html"
+      # Copy all frontend html files
+      Get-ChildItem "$backend/../frontend/*.html" | ForEach-Object {
+        Copy-Item $_.FullName "$build/$($_.Name)"
+      }
+      # Copy static assets directory
+      if (Test-Path "$backend/../frontend/static") {
+        Copy-Item -Recurse "$backend/../frontend/static" "$build/static"
+      }
       Write-Host "Lambda build complete."
     EOT
   }
@@ -86,8 +92,19 @@ resource "aws_iam_role_policy" "dynamo" {
         "dynamodb:PutItem",
         "dynamodb:UpdateItem",
         "dynamodb:DeleteItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
       ]
-      Resource = var.table_arn
+      Resource = [
+        var.users_table_arn,
+        var.devices_table_arn,
+        var.incidents_table_arn,
+        var.audit_table_arn,
+        "${var.users_table_arn}/index/*",
+        "${var.devices_table_arn}/index/*",
+        "${var.incidents_table_arn}/index/*",
+        "${var.audit_table_arn}/index/*",
+      ]
     }]
   })
 }
@@ -106,9 +123,13 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      DYNAMODB_TABLE = var.table_name
+      USERS_TABLE     = var.users_table_name
+      DEVICES_TABLE   = var.devices_table_name
+      INCIDENTS_TABLE = var.incidents_table_name
+      AUDIT_TABLE     = var.audit_table_name
+      JWT_SECRET      = var.jwt_secret
       AWS_REGION_NAME = var.aws_region
-      BASE_URL       = var.base_url
+      BASE_URL        = var.base_url
     }
   }
 

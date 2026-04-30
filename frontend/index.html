@@ -1,66 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>shortlink — URL Shortener</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OT Sentinel</title>
+  <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <main>
-    <header>
-      <h1>shortlink</h1>
-      <p>Paste a long URL, get a short one.</p>
-    </header>
-
-    <section class="card" id="create-section">
-      <form id="shorten-form">
-        <div class="input-row">
-          <input
-            id="url-input"
-            type="url"
-            placeholder="https://very-long-url.com/..."
-            required
-            autocomplete="off"
-          />
-          <input
-            id="code-input"
-            type="text"
-            placeholder="custom alias (optional)"
-            maxlength="20"
-            pattern="[A-Za-z0-9]+"
-            title="Letters and numbers only"
-          />
-        </div>
-        <button type="submit" id="submit-btn">Shorten</button>
-      </form>
-
-      <div id="result" class="result hidden">
-        <span id="short-url-text"></span>
-        <button id="copy-btn" title="Copy to clipboard">Copy</button>
-      </div>
-      <p id="error-msg" class="error hidden"></p>
-    </section>
-
-    <section class="card" id="stats-section">
-      <h2>Check Stats</h2>
-      <div class="input-row">
-        <input id="stats-code" type="text" placeholder="alias (e.g. abc1234)" />
-        <button id="stats-btn">Lookup</button>
-      </div>
-      <div id="stats-result" class="stats-result hidden">
-        <table>
-          <tr><th>Code</th><td id="s-code"></td></tr>
-          <tr><th>Target URL</th><td id="s-url"></td></tr>
-          <tr><th>Short URL</th><td id="s-short"></td></tr>
-          <tr><th>Created</th><td id="s-created"></td></tr>
-          <tr><th>Hits</th><td id="s-hits"></td></tr>
-        </table>
-      </div>
-      <p id="stats-error" class="error hidden"></p>
-    </section>
-  </main>
-
-  <script src="/static/app.js"></script>
+  <script>
+    // Redirect to dashboard if authenticated, otherwise to login
+    const token = localStorage.getItem("ots_token");
+    const user = localStorage.getItem("ots_user");
+    if (token && user) {
+      window.location.replace("/dashboard.html");
+    } else {
+      window.location.replace("/login.html");
+    }
+  </script>
+  <noscript>
+    <div style="text-align:center;padding:40px;color:#94a3b8">
+      Please enable JavaScript to use OT Sentinel.
+      <br><br>
+      <a href="/login.html" style="color:#3b82f6">Go to Login</a>
+    </div>
+  </noscript>
 </body>
 </html>

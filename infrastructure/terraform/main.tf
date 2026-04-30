@@ -19,7 +19,7 @@ terraform {
   # Uncomment after creating the bucket manually once:
   # backend "s3" {
   #   bucket = "YOUR-TERRAFORM-STATE-BUCKET"
-  #   key    = "shortlink/terraform.tfstate"
+  #   key    = "otsentinel/terraform.tfstate"
   #   region = "ap-northeast-1"
   # }
 }
@@ -62,10 +62,18 @@ module "api" {
   source     = "./modules/api"
   prefix     = local.prefix
   tags       = local.tags
-  table_name = module.storage.table_name
-  table_arn  = module.storage.table_arn
   aws_region = var.aws_region
   base_url   = local.base_url
+  jwt_secret = var.jwt_secret
+
+  users_table_name     = module.storage.users_table_name
+  users_table_arn      = module.storage.users_table_arn
+  devices_table_name   = module.storage.devices_table_name
+  devices_table_arn    = module.storage.devices_table_arn
+  incidents_table_name = module.storage.incidents_table_name
+  incidents_table_arn  = module.storage.incidents_table_arn
+  audit_table_name     = module.storage.audit_table_name
+  audit_table_arn      = module.storage.audit_table_arn
 }
 
 module "frontend" {
