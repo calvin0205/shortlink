@@ -11,6 +11,7 @@ from .routes import auth, devices, incidents, dashboard
 from .routes import audit as audit_router
 from .routes import simulate as simulate_router
 from .routes import admin as admin_router
+from .routes import assistant as assistant_router
 
 app = FastAPI(title=settings.app_name, version="1.0.0", docs_url="/api/docs")
 
@@ -30,6 +31,7 @@ app.include_router(incidents.router)
 app.include_router(dashboard.router)
 app.include_router(audit_router.router)
 app.include_router(admin_router.router)
+app.include_router(assistant_router.router)
 
 
 @app.get("/api/health")
