@@ -1,7 +1,7 @@
 variable "aws_region" {
   description = "Primary AWS region for Lambda, DynamoDB, and API Gateway"
   type        = string
-  default     = "ap-east-2"
+  default     = "ap-northeast-1"
 }
 
 variable "domain_name" {
