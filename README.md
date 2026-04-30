@@ -1,6 +1,8 @@
 # shortlink — URL Shortener
 
-A production-grade URL shortener deployed on AWS, built to demonstrate a real serverless + CDN + DNS stack.
+A production-grade URL shortener deployed on AWS, built on a serverless + CDN stack.
+
+**Live site:** https://d37632ffxb5y05.cloudfront.net
 
 ## Architecture
 
@@ -8,27 +10,26 @@ A production-grade URL shortener deployed on AWS, built to demonstrate a real se
 Internet
    │
    ▼
-Route53 ──── A/AAAA alias ──────────────────────────────┐
-                                                         │
-                                              ┌──────────▼──────────┐
-                                              │      CloudFront      │
-                                              │  (CDN + HTTPS/TLS)  │
-                                              └──┬──────────────┬───┘
-                                    /api/*        │              │  /*
-                            ┌───────▼──────┐      │    ┌─────────▼──────┐
-                            │ API Gateway  │      │    │   S3 (static   │
-                            │  (HTTP API)  │      │    │   frontend)    │
-                            └──────┬───────┘      │    └────────────────┘
-                                   │
-                            ┌──────▼───────┐
-                            │    Lambda     │
-                            │  (FastAPI +   │
-                            │    Mangum)    │
-                            └──────┬───────┘
-                                   │
-                            ┌──────▼───────┐
-                            │   DynamoDB   │
-                            └──────────────┘
+┌──────────────────────┐
+│      CloudFront      │
+│  (CDN + HTTPS/TLS)   │
+└──┬───────────────┬───┘
+   │ /static/*     │ /* and /api/*
+   ▼               ▼
+┌──────────┐  ┌──────────────┐
+│ S3       │  │ API Gateway  │
+│ (CSS/JS) │  │  (HTTP API)  │
+└──────────┘  └──────┬───────┘
+                     │
+              ┌──────▼───────┐
+              │    Lambda    │
+              │ (FastAPI +   │
+              │   Mangum)    │
+              └──────┬───────┘
+                     │
+              ┌──────▼───────┐
+              │   DynamoDB   │
+              └──────────────┘
 ```
 
 ## What's in the box
@@ -36,17 +37,14 @@ Route53 ──── A/AAAA alias ───────────────�
 | Layer | Technology |
 |---|---|
 | Backend | Python 3.12, FastAPI, Mangum (Lambda adapter) |
-| Database | DynamoDB (on-demand billing, PITR enabled) |
+| Database | DynamoDB (on-demand billing) |
 | Compute | AWS Lambda |
 | API layer | API Gateway HTTP API v2 |
 | Frontend | Vanilla HTML/CSS/JS (no build step) |
-| CDN | CloudFront (HTTPS, SPA error handling, cache policy) |
-| TLS | ACM certificate — DNS-validated, auto-renews |
-| DNS | Route53 A + AAAA alias records → CloudFront |
+| CDN | CloudFront (HTTPS, cache policy) |
+| TLS | CloudFront default certificate (HTTPS out of the box) |
 | IaC | Terraform ≥ 1.7, modular layout |
 | CI | GitHub Actions — tests + lint on every push |
-| CD | GitHub Actions — Terraform apply + S3 sync + cache invalidation on `main` |
-| Auth to AWS | OIDC (no long-lived keys stored in GitHub secrets) |
 
 ## API
 
@@ -60,92 +58,80 @@ Route53 ──── A/AAAA alias ───────────────�
 ### Create a link
 
 ```bash
-curl -X POST https://yourdomain.com/api/links \
+curl -X POST https://d37632ffxb5y05.cloudfront.net/api/links \
   -H "Content-Type: application/json" \
   -d '{"url": "https://very-long-url.com/...", "custom_code": "gh"}'
-# → {"code":"gh","short_url":"https://yourdomain.com/gh","hits":0,...}
+# → {"code":"gh","short_url":"https://d37632ffxb5y05.cloudfront.net/gh","hits":0,...}
 ```
 
 ## Local development
 
-```bash
+### Prerequisites
+
+- Python 3.12+
+- Docker (for DynamoDB Local)
+
+### Setup
+
+```powershell
 cd backend
-python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m venv .venv
+.venv\Scripts\activate
 pip install -r requirements-dev.txt
-
-# Run tests
-pytest
-
-# Start dev server (hot-reload)
-uvicorn app.main:app --reload
-# API docs → http://localhost:8000/api/docs
 ```
 
-Open `frontend/index.html` directly in a browser or serve with any static server.
+### Start dev server
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\dev-start.ps1
+```
+
+This will:
+1. Start DynamoDB Local in Docker on port 8001
+2. Create the local DynamoDB table
+3. Start the FastAPI server at http://localhost:8000
+
+API docs → http://localhost:8000/api/docs
+
+### Run tests
+
+```powershell
+cd backend
+pytest
+```
+
+Tests use `moto` to mock DynamoDB — no real AWS credentials needed.
 
 ## Deploy to AWS
 
 ### Prerequisites
 
-1. AWS account with a Route53 hosted zone for your domain
-2. Terraform ≥ 1.7 installed
+1. AWS account
+2. Terraform ≥ 1.7
 3. AWS CLI configured (`aws configure`)
-
-### One-time setup
-
-```bash
-# Create an S3 bucket for Terraform state (replace with a unique name)
-aws s3 mb s3://my-tf-state-shortlink --region ap-northeast-1
-
-# Uncomment the `backend "s3"` block in infrastructure/terraform/main.tf
-# and set the bucket name
-```
 
 ### Provision infrastructure
 
-```bash
+```powershell
 cd infrastructure/terraform
 terraform init
-terraform apply -var="domain_name=short.example.com"
+terraform apply -auto-approve
 ```
 
-Terraform will:
-1. Create the DynamoDB table
-2. Package and deploy the Lambda function
-3. Create API Gateway + Lambda permission
-4. Create S3 bucket (private) + Origin Access Control
-5. Request ACM certificate and auto-validate it via DNS
-6. Create CloudFront distribution with HTTPS + custom domain
-7. Create Route53 A + AAAA alias records
+After the first apply, set `base_url_override` to the CloudFront URL shown in the output:
 
-### CI/CD (GitHub Actions)
-
-Add these to your repo's **Settings → Secrets and variables**:
-
-| Secret | Value |
-|---|---|
-| `AWS_DEPLOY_ROLE_ARN` | ARN of the IAM role GitHub can assume (OIDC) |
-
-| Variable | Value |
-|---|---|
-| `DOMAIN_NAME` | Your domain (e.g. `short.example.com`) |
-
-The CD pipeline runs on every push to `main`:
-- Runs all tests first (fails fast)
-- `terraform apply` to sync infrastructure
-- `aws s3 sync` to push frontend assets
-- CloudFront cache invalidation
-
-### Setting up GitHub OIDC trust (no stored keys)
-
-```bash
-# In AWS IAM → Identity Providers → Add provider
-# Provider URL: https://token.actions.githubusercontent.com
-# Audience: sts.amazonaws.com
-
-# Then create a role with this trust condition:
-# "token.actions.githubusercontent.com:sub": "repo:YOUR_ORG/YOUR_REPO:ref:refs/heads/main"
+```powershell
+terraform apply "-var=base_url_override=https://xxxxx.cloudfront.net" -auto-approve
 ```
+
+### Upload frontend assets
+
+```powershell
+aws s3 sync frontend\ s3://<s3_frontend_bucket>/static/ --exclude "*.html"
+aws cloudfront create-invalidation --distribution-id <cloudfront_distribution_id> --paths "/*"
+```
+
+Replace `<s3_frontend_bucket>` and `<cloudfront_distribution_id>` with values from `terraform output`.
 
 ## Project structure
 
@@ -173,7 +159,10 @@ shortlink/
 │       ├── storage/         # DynamoDB
 │       ├── api/             # Lambda + API Gateway
 │       ├── frontend/        # S3 + CloudFront
-│       └── dns/             # Route53 + ACM
+│       └── dns/             # Route53 + ACM (optional, for custom domain)
+├── scripts/
+│   ├── dev-start.ps1        # One-command local dev startup
+│   └── create-table.py      # Creates DynamoDB table locally
 └── .github/workflows/
     ├── ci.yml               # Test + lint on all branches
     └── cd.yml               # Deploy on push to main
