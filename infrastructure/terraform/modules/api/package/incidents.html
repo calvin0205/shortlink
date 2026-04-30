@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Incidents — OT Sentinel</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <span>🛡️</span> OT Sentinel
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/dashboard.html" class="nav-item">
+          <span class="nav-icon">📊</span> Dashboard
+        </a>
+        <a href="/devices.html" class="nav-item">
+          <span class="nav-icon">🖥️</span> Devices
+        </a>
+        <a href="/incidents.html" class="nav-item active">
+          <span class="nav-icon">⚠️</span> Incidents
+        </a>
+        <a href="/ai-assistant.html" class="nav-item">
+          <span class="nav-icon">🤖</span> AI Assistant
+        </a>
+        <a href="/admin.html" class="nav-item">
+          <span class="nav-icon">👤</span> Admin
+        </a>
+        <a href="/audit-log.html" class="nav-item">
+          <span class="nav-icon">📋</span> Audit Log
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <button onclick="logout()" class="btn btn-ghost" style="width:100%">
+          🚪 Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main-content">
+      <header class="header">
+        <h2>Incidents</h2>
+        <div class="user-info">
+          <span id="header-user"></span>
+          <span id="header-role" class="badge badge-admin" style="margin-left:8px"></span>
+        </div>
+      </header>
+      <div class="page-content">
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Security Incidents</span>
+            <span id="incident-count" class="text-secondary text-sm"></span>
+          </div>
+
+          <!-- Filter Bar -->
+          <div class="filter-bar">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="critical">Critical</button>
+            <button class="filter-btn" data-filter="high">High</button>
+            <button class="filter-btn" data-filter="medium">Medium</button>
+            <button class="filter-btn" data-filter="low">Low</button>
+          </div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Device</th>
+                  <th>Severity</th>
+                  <th>Status</th>
+                  <th>Title</th>
+                  <th>Risk Score</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="incidents-body">
+                <tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">⏳</div>Loading incidents…</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script src="/static/incidents.js"></script>
+</body>
+</html>

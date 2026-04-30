@@ -7,8 +7,14 @@ resource "aws_dynamodb_table" "users" {
     Description = "OT Sentinel users table with email GSI"
   })
 
-  attribute { name = "PK";    type = "S" }
-  attribute { name = "email"; type = "S" }
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+  attribute {
+    name = "email"
+    type = "S"
+  }
 
   global_secondary_index {
     name            = "email-index"
@@ -26,10 +32,22 @@ resource "aws_dynamodb_table" "devices" {
     Description = "OT Sentinel devices table with status-index and site-index GSIs"
   })
 
-  attribute { name = "PK";       type = "S" }
-  attribute { name = "status";   type = "S" }
-  attribute { name = "last_seen"; type = "S" }
-  attribute { name = "site_id";  type = "S" }
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+  attribute {
+    name = "status"
+    type = "S"
+  }
+  attribute {
+    name = "last_seen"
+    type = "S"
+  }
+  attribute {
+    name = "site_id"
+    type = "S"
+  }
 
   global_secondary_index {
     name            = "status-index"
@@ -55,10 +73,22 @@ resource "aws_dynamodb_table" "incidents" {
     Description = "OT Sentinel incidents table with device-index and severity-index GSIs"
   })
 
-  attribute { name = "PK";         type = "S" }
-  attribute { name = "device_id";  type = "S" }
-  attribute { name = "created_at"; type = "S" }
-  attribute { name = "severity";   type = "S" }
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+  attribute {
+    name = "device_id"
+    type = "S"
+  }
+  attribute {
+    name = "created_at"
+    type = "S"
+  }
+  attribute {
+    name = "severity"
+    type = "S"
+  }
 
   global_secondary_index {
     name            = "device-index"
@@ -84,9 +114,18 @@ resource "aws_dynamodb_table" "audit" {
     Description = "OT Sentinel audit log table with user-index GSI"
   })
 
-  attribute { name = "PK";        type = "S" }
-  attribute { name = "user_id";   type = "S" }
-  attribute { name = "timestamp"; type = "S" }
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+  attribute {
+    name = "user_id"
+    type = "S"
+  }
+  attribute {
+    name = "timestamp"
+    type = "S"
+  }
 
   global_secondary_index {
     name            = "user-index"

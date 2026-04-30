@@ -7,7 +7,7 @@
 # This avoids bundling .venv (which exceeds Lambda's 70 MB upload limit).
 
 locals {
-  build_dir   = "${path.module}/build"
+  build_dir   = "${path.module}/package"
   backend_dir = abspath("${path.root}/../../backend")
 }
 
@@ -31,11 +31,15 @@ resource "null_resource" "lambda_build" {
       # Download Linux-compatible wheels (Lambda runs on Amazon Linux 2 x86_64).
       # --platform and --only-binary force pip to fetch manylinux wheels even on Windows.
       pip install -r "$backend/requirements.txt" -t $build --quiet --no-cache-dir `
+        --no-compile `
         --platform manylinux2014_x86_64 `
         --only-binary=:all: `
         --python-version 3.12 `
         --implementation cp
       Copy-Item -Recurse "$backend/app" "$build/app"
+      # Remove any __pycache__ directories to keep package clean
+      Get-ChildItem -Path $build -Recurse -Directory -Filter '__pycache__' |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
       # Copy all frontend html files
       Get-ChildItem "$backend/../frontend/*.html" | ForEach-Object {
         Copy-Item $_.FullName "$build/$($_.Name)"

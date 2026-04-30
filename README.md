@@ -3,8 +3,8 @@
 > A production-grade OT/IoT security monitoring platform built on AWS serverless architecture.
 > Designed to demonstrate real-world DevSecOps practices for industrial cybersecurity.
 
-**Live Demo**: https://d37632ffxb5y05.cloudfront.net  
-**API Docs**: https://d37632ffxb5y05.cloudfront.net/api/docs
+**Live Demo**: https://d25q7wq8kn7oag.cloudfront.net  
+**API Docs**: https://d25q7wq8kn7oag.cloudfront.net/api/docs
 
 ---
 
@@ -197,7 +197,7 @@ terraform apply -var="base_url_override=https://xxxxx.cloudfront.net" -auto-appr
 
 ### Upload frontend
 ```powershell
-aws s3 sync frontend\ s3://<s3_frontend_bucket>\static\ --exclude "*.html"
+aws s3 sync frontend\static\ s3://<s3_frontend_bucket>/static/
 aws cloudfront create-invalidation --distribution-id <cf_id> --paths "/*"
 ```
 

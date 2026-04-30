@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Devices — OT Sentinel</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <span>🛡️</span> OT Sentinel
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/dashboard.html" class="nav-item">
+          <span class="nav-icon">📊</span> Dashboard
+        </a>
+        <a href="/devices.html" class="nav-item active">
+          <span class="nav-icon">🖥️</span> Devices
+        </a>
+        <a href="/incidents.html" class="nav-item">
+          <span class="nav-icon">⚠️</span> Incidents
+        </a>
+        <a href="/ai-assistant.html" class="nav-item">
+          <span class="nav-icon">🤖</span> AI Assistant
+        </a>
+        <a href="/admin.html" class="nav-item">
+          <span class="nav-icon">👤</span> Admin
+        </a>
+        <a href="/audit-log.html" class="nav-item">
+          <span class="nav-icon">📋</span> Audit Log
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <button onclick="logout()" class="btn btn-ghost" style="width:100%">
+          🚪 Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main-content">
+      <header class="header">
+        <h2>Devices</h2>
+        <div class="user-info">
+          <span id="header-user"></span>
+          <span id="header-role" class="badge badge-admin" style="margin-left:8px"></span>
+        </div>
+      </header>
+      <div class="page-content">
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">OT/IoT Device Inventory</span>
+            <span id="device-count" class="text-secondary text-sm"></span>
+          </div>
+
+          <!-- Filter Bar -->
+          <div class="filter-bar">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="online">Online</button>
+            <button class="filter-btn" data-filter="warning">Warning</button>
+            <button class="filter-btn" data-filter="critical">Critical</button>
+            <button class="filter-btn" data-filter="offline">Offline</button>
+          </div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Site</th>
+                  <th>Status</th>
+                  <th>IP Address</th>
+                  <th>Firmware</th>
+                  <th>Last Seen</th>
+                  <th>Risk Score</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="devices-body">
+                <tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">⏳</div>Loading devices…</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Simulate Anomaly Modal -->
+  <div id="simulate-modal" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="closeSimulateModal()"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>⚡ Simulate Anomaly</h3>
+        <button onclick="closeSimulateModal()" class="btn btn-ghost">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="text-secondary" style="margin-bottom:16px">
+          Device: <strong id="modal-device-name"></strong>
+        </p>
+        <div class="form-group">
+          <label class="form-label">Anomaly Type</label>
+          <select id="anomaly-type-select" class="form-input">
+            <!-- populated by JS -->
+          </select>
+        </div>
+        <div id="simulate-result" style="display:none" class="simulate-result-card">
+          <!-- result shown here -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button onclick="closeSimulateModal()" class="btn btn-ghost">Cancel</button>
+        <button onclick="runSimulation()" class="btn btn-danger" id="simulate-btn">⚡ Simulate</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script src="/static/devices.js"></script>
+</body>
+</html>
