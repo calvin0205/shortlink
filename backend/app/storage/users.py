@@ -1,6 +1,5 @@
 from datetime import datetime, timezone
 from typing import Optional
-from uuid import uuid4
 
 from boto3.dynamodb.conditions import Key
 

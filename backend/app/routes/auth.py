@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 
 from ..auth import create_access_token, verify_password
 from ..dependencies import get_current_user
@@ -10,6 +10,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 @router.post("/login", response_model=TokenResponse)
 def login(body: LoginRequest):
+    """Authenticate with email and password. Returns a JWT Bearer token valid for 8 hours."""
     user = get_user_by_email(body.email)
     if not user or not verify_password(body.password, user.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -27,6 +28,7 @@ def login(body: LoginRequest):
 
 @router.get("/me")
 async def me(current_user=Depends(get_current_user)):
+    """Get the currently authenticated user's profile."""
     return {
         "user_id": current_user["user_id"],
         "email": current_user["email"],

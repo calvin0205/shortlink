@@ -1,5 +1,4 @@
 import random
-from dataclasses import dataclass
 from typing import Tuple
 
 # Anomaly types with (base_min, base_max, title_template, description_template)

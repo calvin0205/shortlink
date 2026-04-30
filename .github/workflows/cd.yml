@@ -2,78 +2,74 @@ name: CD
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    branches: [master]
 
 permissions:
-  id-token: write   # OIDC — no long-lived AWS keys stored in secrets
+  id-token: write
   contents: read
 
-env:
-  AWS_REGION: ap-northeast-1
-  TF_DIR: infrastructure/terraform
-
 jobs:
-  test:
-    name: Tests must pass before deploy
-    uses: ./.github/workflows/ci.yml
-
   deploy:
     name: Deploy to AWS
-    needs: test
     runs-on: ubuntu-latest
     environment: production
-
     steps:
       - uses: actions/checkout@v4
 
-      # ── Auth ─────────────────────────────────────────────────────────────
-      # Uses OIDC — no AWS_SECRET_ACCESS_KEY needed.
-      # Set up: IAM → Identity Providers → Add GitHub OIDC provider, then create
-      # a role with condition  token.actions.githubusercontent.com:sub = repo:<owner>/<repo>:ref:refs/heads/main
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run tests before deploy
+        working-directory: backend
+        env:
+          USERS_TABLE: otsentinel-test-users
+          DEVICES_TABLE: otsentinel-test-devices
+          INCIDENTS_TABLE: otsentinel-test-incidents
+          AUDIT_TABLE: otsentinel-test-audit
+          JWT_SECRET: test-secret-ci
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          pip install -r requirements-dev.txt
+          pytest --tb=short -q
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ap-northeast-1
 
-      # ── Terraform ─────────────────────────────────────────────────────────
-      - name: Set up Terraform
+      - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "~1.7"
+          terraform_version: "1.7.0"
 
-      - name: Terraform init
+      - name: Terraform Init
+        working-directory: infrastructure/terraform
         run: terraform init
-        working-directory: ${{ env.TF_DIR }}
 
-      - name: Terraform plan
-        run: terraform plan -out=tfplan -var="domain_name=${{ vars.DOMAIN_NAME }}"
-        working-directory: ${{ env.TF_DIR }}
+      - name: Terraform Apply
+        working-directory: infrastructure/terraform
+        run: |
+          terraform apply -auto-approve \
+            -var="base_url_override=${{ vars.CLOUDFRONT_URL }}" \
+            -var="jwt_secret=${{ secrets.JWT_SECRET }}"
 
-      - name: Terraform apply
-        run: terraform apply tfplan
-        working-directory: ${{ env.TF_DIR }}
+      - name: Get Terraform outputs
+        id: tf_output
+        working-directory: infrastructure/terraform
+        run: |
+          echo "s3_bucket=$(terraform output -raw s3_frontend_bucket)" >> $GITHUB_OUTPUT
+          echo "cf_id=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
 
-      # ── Deploy frontend assets to S3 ──────────────────────────────────────
       - name: Sync frontend to S3
         run: |
-          BUCKET=$(terraform -chdir=$TF_DIR output -raw s3_frontend_bucket)
-          aws s3 sync frontend/ s3://$BUCKET/ \
-            --delete \
-            --cache-control "public,max-age=31536000,immutable" \
-            --exclude "*.html"
-          # HTML: no cache — always fetch fresh
-          aws s3 sync frontend/ s3://$BUCKET/ \
-            --delete \
-            --cache-control "no-cache" \
-            --include "*.html" \
-            --exclude "*"
+          aws s3 sync frontend/ s3://${{ steps.tf_output.outputs.s3_bucket }}/static/ \
+            --exclude "*.html" --delete
 
-      # ── Invalidate CloudFront cache ────────────────────────────────────────
-      - name: Invalidate CloudFront
+      - name: Invalidate CloudFront cache
         run: |
-          DIST_ID=$(terraform -chdir=$TF_DIR output -raw cloudfront_distribution_id)
           aws cloudfront create-invalidation \
-            --distribution-id "$DIST_ID" \
+            --distribution-id ${{ steps.tf_output.outputs.cf_id }} \
             --paths "/*"

@@ -18,6 +18,7 @@ async def get_incidents(
     status: Optional[str] = Query(None),
     current_user=Depends(get_current_user),
 ):
+    """List all security incidents. Filter by severity and/or status."""
     incidents = list_incidents(severity=severity, status_filter=status)
     return incidents
 
@@ -27,6 +28,7 @@ async def get_incident_by_id(
     incident_id: str,
     current_user=Depends(get_current_user),
 ):
+    """Get detailed information about a specific incident."""
     incident = get_incident(incident_id)
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
@@ -40,6 +42,7 @@ async def acknowledge_incident(
     request: Request,
     current_user=Depends(get_current_user),
 ):
+    """Acknowledge an incident — changes status from 'open' to 'investigating'."""
     # 1. Get incident
     incident = get_incident(incident_id)
     if not incident:
@@ -75,6 +78,7 @@ async def resolve_incident(
     request: Request,
     current_user=Depends(get_current_user),
 ):
+    """Resolve an incident — changes status to 'resolved' and resets device status to 'online'."""
     # 1. Get incident
     incident = get_incident(incident_id)
     if not incident:
