@@ -189,6 +189,13 @@ function timeAgo(iso) {
   }
 }
 
+// ── Role helpers ──────────────────────────────────────────────────────────────
+
+function isAdmin() {
+  const user = getUser();
+  return user && user.role === "admin";
+}
+
 // ── Short ID ──────────────────────────────────────────────────────────────────
 
 function shortId(id) {

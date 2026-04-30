@@ -9,6 +9,8 @@ from mangum import Mangum
 from .config import settings
 from .routes import auth, devices, incidents, dashboard
 from .routes import audit as audit_router
+from .routes import simulate as simulate_router
+from .routes import admin as admin_router
 
 app = FastAPI(title=settings.app_name, version="1.0.0", docs_url="/api/docs")
 
@@ -20,10 +22,14 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+# simulate router must be included BEFORE devices router to avoid path collision
+# (/api/devices/anomaly-types would be captured as {device_id} otherwise)
+app.include_router(simulate_router.router)
 app.include_router(devices.router)
 app.include_router(incidents.router)
 app.include_router(dashboard.router)
 app.include_router(audit_router.router)
+app.include_router(admin_router.router)
 
 
 @app.get("/api/health")

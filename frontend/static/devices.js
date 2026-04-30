@@ -10,6 +10,7 @@ initPageHeader();
 
 let allDevices = [];
 let currentFilter = "all";
+let _simulateDeviceId = null;
 
 async function loadDevices() {
   const tbody = document.getElementById("devices-body");
@@ -67,9 +68,107 @@ function renderDevices(filter) {
       <td><span class="font-mono text-sm">${d.firmware_version || "—"}</span></td>
       <td class="text-secondary">${timeAgo(d.last_seen)}</td>
       <td>${riskBar(d.risk_score)}</td>
+      <td>
+        <button onclick="openSimulateModal('${d.device_id}', '${(d.name || "").replace(/'/g, "\\'")}')" class="btn btn-danger" style="font-size:0.75rem;padding:4px 10px">⚡ Simulate</button>
+      </td>
     </tr>`
     )
     .join("");
+}
+
+// ── Simulate Anomaly Modal ─────────────────────────────────────────────────────
+
+async function loadAnomalyTypes() {
+  try {
+    const types = await apiFetch("/api/devices/anomaly-types");
+    const select = document.getElementById("anomaly-type-select");
+    if (!select) return;
+    select.innerHTML = types
+      .map((t) => `<option value="${t.value}">${t.label}</option>`)
+      .join("");
+  } catch (err) {
+    console.error("Failed to load anomaly types:", err.message);
+  }
+}
+
+function openSimulateModal(deviceId, deviceName) {
+  _simulateDeviceId = deviceId;
+  const nameEl = document.getElementById("modal-device-name");
+  if (nameEl) nameEl.textContent = deviceName;
+
+  // Reset result area
+  const resultEl = document.getElementById("simulate-result");
+  if (resultEl) {
+    resultEl.style.display = "none";
+    resultEl.innerHTML = "";
+  }
+
+  // Re-enable simulate button
+  const btn = document.getElementById("simulate-btn");
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = "⚡ Simulate";
+  }
+
+  document.getElementById("simulate-modal").style.display = "flex";
+}
+
+function closeSimulateModal() {
+  document.getElementById("simulate-modal").style.display = "none";
+  _simulateDeviceId = null;
+}
+
+async function runSimulation() {
+  if (!_simulateDeviceId) return;
+
+  const select = document.getElementById("anomaly-type-select");
+  const anomalyType = select ? select.value : "";
+  if (!anomalyType) {
+    showToast("Please select an anomaly type", "error");
+    return;
+  }
+
+  const btn = document.getElementById("simulate-btn");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Running…";
+  }
+
+  try {
+    const result = await apiFetch(`/api/devices/${_simulateDeviceId}/simulate`, {
+      method: "POST",
+      body: JSON.stringify({ anomaly_type: anomalyType }),
+    });
+
+    const resultEl = document.getElementById("simulate-result");
+    if (resultEl) {
+      resultEl.style.display = "block";
+      resultEl.innerHTML = `
+        <div style="text-align:center;margin-bottom:12px">
+          <div style="font-size:0.75rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em">Risk Score</div>
+          <div class="risk-score-display">${result.risk_score}</div>
+          <div>${severityBadge(result.severity)}</div>
+        </div>
+        <div style="font-size:0.875rem;font-weight:600;margin-bottom:4px">${result.title}</div>
+        <div style="font-size:0.8rem;color:var(--text-secondary)">${result.message}</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px">Incident ID: <span class="font-mono">${shortId(result.incident_id)}</span></div>
+      `;
+    }
+
+    // Reload device list to reflect updated status
+    await loadDevices();
+
+    showToast(`Anomaly simulated — risk score ${result.risk_score} (${result.severity})`, "error");
+
+    // Auto-close after brief delay
+    setTimeout(() => closeSimulateModal(), 4000);
+  } catch (err) {
+    showToast("Simulation failed: " + err.message, "error");
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "⚡ Simulate";
+    }
+  }
 }
 
 // Filter button click handlers
@@ -82,4 +181,5 @@ document.querySelectorAll(".filter-btn").forEach((btn) => {
   });
 });
 
+loadAnomalyTypes();
 loadDevices();

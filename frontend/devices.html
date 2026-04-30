@@ -78,15 +78,45 @@
                   <th>Firmware</th>
                   <th>Last Seen</th>
                   <th>Risk Score</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="devices-body">
-                <tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">⏳</div>Loading devices…</div></td></tr>
+                <tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">⏳</div>Loading devices…</div></td></tr>
               </tbody>
             </table>
           </div>
         </div>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- Simulate Anomaly Modal -->
+  <div id="simulate-modal" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="closeSimulateModal()"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>⚡ Simulate Anomaly</h3>
+        <button onclick="closeSimulateModal()" class="btn btn-ghost">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="text-secondary" style="margin-bottom:16px">
+          Device: <strong id="modal-device-name"></strong>
+        </p>
+        <div class="form-group">
+          <label class="form-label">Anomaly Type</label>
+          <select id="anomaly-type-select" class="form-input">
+            <!-- populated by JS -->
+          </select>
+        </div>
+        <div id="simulate-result" style="display:none" class="simulate-result-card">
+          <!-- result shown here -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button onclick="closeSimulateModal()" class="btn btn-ghost">Cancel</button>
+        <button onclick="runSimulation()" class="btn btn-danger" id="simulate-btn">⚡ Simulate</button>
       </div>
     </div>
   </div>

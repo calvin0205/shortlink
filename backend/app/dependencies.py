@@ -19,3 +19,7 @@ async def require_admin(user=Depends(get_current_user)):
     if user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin required")
     return user
+
+
+# Alias: both operators and admins may access these routes
+require_operator_or_admin = get_current_user
