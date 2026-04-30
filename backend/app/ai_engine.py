@@ -231,6 +231,40 @@ def analyze_incident(incident: dict) -> dict:
     }
 
 
+GENERAL_RESPONSES = {
+    "iec62443": {
+        "keywords": ["iec 62443", "iec62443", "62443"],
+        "answer": "**IEC 62443 — OT Security Standard**\n\nIEC 62443 is the international standard series for Industrial Automation and Control Systems (IACS) security. It defines security requirements and processes for OT/ICS environments.\n\n**Key components:**\n• **62443-1**: General concepts and terminology\n• **62443-2**: Policies, procedures, and organizational security\n• **62443-3**: System-level security requirements and Security Levels (SL 1-4)\n• **62443-4**: Component-level security requirements\n\n**Security Levels:**\n• SL1 — Protection against casual/unintentional violations\n• SL2 — Protection against intentional violation with simple means\n• SL3 — Protection against sophisticated attacks\n• SL4 — Protection against state-sponsored attacks",
+        "recommendations": ["Perform an IEC 62443 gap assessment", "Define target Security Levels for each zone", "Implement a Security Management System per 62443-2-1", "Ensure component procurement requirements include 62443-4-2 compliance"],
+        "references": ["IEC 62443-1-1", "IEC 62443-2-1", "IEC 62443-3-3", "IEC 62443-4-2"],
+    },
+    "nist": {
+        "keywords": ["nist", "sp 800-82", "800-82"],
+        "answer": "**NIST SP 800-82 — Guide to ICS Security**\n\nNIST Special Publication 800-82 provides guidance for securing Industrial Control Systems including SCADA, DCS, PLC, and other OT systems.\n\n**Key areas covered:**\n• ICS threat landscape and vulnerabilities\n• Security architecture recommendations\n• Network segmentation and DMZ design\n• Incident response for ICS environments\n• Risk management framework application to ICS",
+        "recommendations": ["Apply NIST Risk Management Framework (RMF) to OT systems", "Implement the ICS security architecture with IT/OT network separation", "Follow NIST incident response guidelines", "Conduct regular risk assessments using NIST methodology"],
+        "references": ["NIST SP 800-82 Rev.3", "NIST SP 800-37", "NIST CSF 2.0"],
+    },
+    "risk_score": {
+        "keywords": ["risk score", "how is risk", "risk calculation", "score calculated", "risk scoring"],
+        "answer": "**OT Sentinel Risk Scoring Methodology**\n\nRisk scores (0–100) are calculated using two factors:\n\n**1. Anomaly Type Base Score:**\n• Sensor Manipulation: 78–94\n• Unauthorized Access: 82–96\n• Firmware Tampering: 78–92\n• Brute Force: 72–88\n• Protocol Anomaly: 68–84\n• Config Change: 62–78\n• Unusual Traffic: 52–68\n• Network Scan: 55–72\n• Memory Overflow: 42–58\n• Comm Timeout: 35–52\n\n**2. Device Type Multiplier:**\n• PLC: ×1.20 (controls physical processes)\n• RTU: ×1.15\n• HMI: ×1.10\n• Gateway: ×1.05\n• Sensor: ×1.00\n\n**Severity Mapping:** Critical ≥80 · High 60–79 · Medium 40–59 · Low <40",
+        "recommendations": ["Focus remediation on Critical (≥80) scores first", "PLCs with any anomaly should be prioritized due to 1.2x multiplier", "Review Medium scores proactively to prevent escalation"],
+        "references": ["IEC 62443-3-2", "NIST SP 800-30"],
+    },
+    "mitre": {
+        "keywords": ["mitre", "att&ck", "attack framework", "ics tactics"],
+        "answer": "**MITRE ATT&CK for ICS**\n\nMITRE ATT&CK for ICS is a knowledge base of adversary tactics and techniques specifically for Industrial Control Systems.\n\n**Key Tactic Categories:**\n• Initial Access — spear phishing, exploit public-facing apps\n• Execution — command-line, scripting\n• Persistence — modify program, hooking\n• Evasion — rootkit, masquerading\n• Discovery — remote system discovery, network sniffing\n• Lateral Movement — exploitation of remote services\n• Collection — automated collection, point & tag identification\n• **Impact — Manipulation of Control (T0831), Loss of Safety (T0837), Damage to Property (T0879)**",
+        "recommendations": ["Map detected incidents to MITRE ATT&CK for ICS techniques", "Use the framework for threat hunting in OT environments", "Develop detection rules based on ICS-specific TTPs"],
+        "references": ["MITRE ATT&CK for ICS", "ICS-CERT Advisories", "CISA AA22-265A"],
+    },
+    "network_segmentation": {
+        "keywords": ["network segmentation", "dmz", "zone", "purdue", "conduit", "it ot separation", "air gap"],
+        "answer": "**OT Network Segmentation Best Practices**\n\nProper network segmentation is the most effective control for preventing IT-to-OT lateral movement.\n\n**Purdue Model Zones:**\n• Level 0 — Physical process (sensors, actuators)\n• Level 1 — Intelligent devices (PLCs, RTUs)\n• Level 2 — Control systems (HMI, SCADA)\n• Level 3 — Manufacturing operations (historian, MES)\n• **DMZ** — Boundary between IT and OT\n• Level 4/5 — Enterprise IT\n\n**Key Controls:**\n• Industrial DMZ with dual firewalls\n• Data diodes for one-way communication\n• Jump servers for remote access\n• No direct internet connectivity for OT devices",
+        "recommendations": ["Implement industrial DMZ between IT and OT networks", "Deploy unidirectional gateways for historian data", "Use jump servers for all OT remote access", "Disable unnecessary protocols and ports at zone boundaries"],
+        "references": ["IEC 62443-3-2", "NIST SP 800-82 Section 5.3", "ISA-99 Zone Model"],
+    },
+}
+
+
 def process_query(message: str, incident: Optional[dict] = None) -> dict:
     """
     Main query processor. Returns structured response dict.
@@ -251,29 +285,77 @@ def process_query(message: str, incident: Optional[dict] = None) -> dict:
         result["source"] = "rule-based"
         return result
 
-    # General query
+    # Check general knowledge topics first (specific enough to match before keyword search)
+    for topic, data in GENERAL_RESPONSES.items():
+        if any(kw in msg_lower for kw in data["keywords"]):
+            return {
+                "answer": data["answer"],
+                "recommendations": data["recommendations"],
+                "references": data["references"],
+                "severity_assessment": None,
+                "incident_context": None,
+                "source": "rule-based",
+            }
+
+    # Device-specific question
+    if any(d.lower() in msg_lower for d in ["plc", "rtu", "hmi", "gateway", "sensor"]):
+        device_type = next((d for d in ["PLC", "RTU", "HMI", "Gateway", "Sensor"] if d.lower() in msg_lower), None)
+        guidance = DEVICE_GUIDANCE.get(device_type, "")
+        kb = _match_knowledge(message)
+        answer = f"**{device_type} Security Guidance**\n\n{guidance}"
+        if kb != KNOWLEDGE_BASE["general"]:
+            answer += f"\n\n**Threat Context**\n\n{kb['analysis']}"
+        return {
+            "answer": answer,
+            "recommendations": kb["recommendations"],
+            "references": kb["references"],
+            "severity_assessment": kb.get("severity_note"),
+            "incident_context": None,
+            "source": "rule-based",
+        }
+
+    # Security threat keyword matching
     kb = _match_knowledge(message)
 
-    # Build contextual answer based on question type
-    if any(w in msg_lower for w in ["what", "explain", "describe", "tell me"]):
-        answer = f"**OT Security Analysis**\n\n{kb['analysis']}\n\n{kb['severity_note']}"
-    elif any(w in msg_lower for w in ["how", "steps", "procedure", "should i", "what should"]):
-        answer = f"**Recommended Response Procedure**\n\n{kb['analysis']}\n\nFollow the recommendations below to address this security concern effectively."
-    elif any(w in msg_lower for w in ["risk", "score", "severity", "dangerous", "critical"]):
-        answer = (
-            "**Risk Assessment Framework**\n\n"
-            "OT Sentinel calculates risk scores (0-100) based on:\n"
-            "• **Anomaly type** — base risk range per threat category\n"
-            "• **Device type** — PLCs score 1.2x higher than Sensors due to physical impact potential\n"
-            "• **Severity mapping**: Critical (≥80), High (60-79), Medium (40-59), Low (<40)\n\n"
-            f"{kb['analysis']}"
-        )
-    elif any(w in msg_lower for w in ["plc", "rtu", "hmi", "gateway", "sensor"]):
-        device_type = next((d for d in ["PLC", "RTU", "HMI", "Gateway", "Sensor"] if d.lower() in msg_lower), None)
-        guidance = DEVICE_GUIDANCE.get(device_type, kb["analysis"]) if device_type else kb["analysis"]
-        answer = f"**Device-Specific Security Guidance**\n\n{guidance}\n\n{kb['analysis']}"
+    if kb != KNOWLEDGE_BASE["general"]:
+        # Matched a specific threat category
+        if any(w in msg_lower for w in ["how", "steps", "procedure", "should i", "what should", "respond", "handle", "fix"]):
+            answer = f"**Response Procedure**\n\n{kb['analysis']}\n\nFollow the steps below to address this effectively."
+        else:
+            answer = f"**Threat Analysis**\n\n{kb['analysis']}\n\n⚠️ {kb['severity_note']}"
     else:
-        answer = f"**Security Advisory**\n\n{kb['analysis']}\n\n{kb['severity_note']}"
+        # General fallback — vary by question type
+        if any(w in msg_lower for w in ["help", "start", "begin", "overview", "introduction"]):
+            answer = ("**OT Sentinel — Getting Started**\n\n"
+                      "OT Sentinel monitors OT/IoT devices for security anomalies. Here's what you can do:\n\n"
+                      "• **Simulate Anomaly** — Go to Devices page and click ⚡ to trigger a simulated attack\n"
+                      "• **Investigate Incidents** — Review incidents on the Incidents page, acknowledge and resolve them\n"
+                      "• **Ask me anything** — Ask about specific threats (firmware tampering, unauthorized access, etc.)\n"
+                      "• **Select an incident** — Use the dropdown above to get context-aware analysis\n\n"
+                      "Try asking about: IEC 62443, risk scoring, network segmentation, or specific device types.")
+        elif any(w in msg_lower for w in ["risk", "score", "severity", "dangerous"]):
+            answer = ("**Risk Assessment Overview**\n\n"
+                      "OT Sentinel uses a 0–100 risk scoring system. Scores are calculated from:\n"
+                      "• Anomaly type severity (e.g., unauthorized access scores higher than comm timeout)\n"
+                      "• Device type multiplier (PLCs score 1.2x higher due to physical process impact)\n\n"
+                      "Ask me 'how is risk score calculated' for the full breakdown.")
+        elif any(w in msg_lower for w in ["what", "explain", "tell me", "describe"]):
+            answer = ("**OT/ICS Security Overview**\n\n"
+                      "OT (Operational Technology) security protects industrial control systems from cyber threats. "
+                      "Unlike IT security, OT attacks can cause physical damage, safety incidents, or environmental harm.\n\n"
+                      "Key threats in OT environments:\n"
+                      "• Unauthorized access to PLCs/RTUs\n• Firmware tampering\n• Protocol anomalies (Modbus, DNP3)\n"
+                      "• Sensor data manipulation\n• Network reconnaissance\n\n"
+                      "Try asking about a specific threat or select an incident from the dropdown for detailed analysis.")
+        else:
+            answer = ("**Security Advisory**\n\n"
+                      "I can help you analyze OT/ICS security threats. Try asking about:\n\n"
+                      "• A specific threat type (e.g., 'explain firmware tampering')\n"
+                      "• A device type (e.g., 'how to secure a PLC')\n"
+                      "• A standard (e.g., 'what is IEC 62443')\n"
+                      "• Risk scoring methodology\n"
+                      "• Network segmentation best practices\n\n"
+                      "Or select an incident from the dropdown above for context-aware analysis.")
 
     return {
         "answer": answer,
