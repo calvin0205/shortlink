@@ -271,10 +271,9 @@ def process_query(message: str, incident: Optional[dict] = None) -> dict:
     """
     msg_lower = message.lower()
 
-    # If incident context provided, prioritize incident-specific analysis
+    incident_context_payload = None
     if incident:
-        result = analyze_incident(incident)
-        result["incident_context"] = {
+        incident_context_payload = {
             "incident_id": incident.get("incident_id", ""),
             "title": incident.get("title", ""),
             "severity": incident.get("severity", ""),
@@ -282,10 +281,8 @@ def process_query(message: str, incident: Optional[dict] = None) -> dict:
             "status": incident.get("status", ""),
             "risk_score": int(incident.get("risk_score", 0)),
         }
-        result["source"] = "rule-based"
-        return result
 
-    # Check general knowledge topics first (specific enough to match before keyword search)
+    # Check general knowledge topics first — these always answer regardless of incident context
     for topic, data in GENERAL_RESPONSES.items():
         if any(kw in msg_lower for kw in data["keywords"]):
             return {
@@ -293,9 +290,42 @@ def process_query(message: str, incident: Optional[dict] = None) -> dict:
                 "recommendations": data["recommendations"],
                 "references": data["references"],
                 "severity_assessment": None,
-                "incident_context": None,
+                "incident_context": incident_context_payload,
                 "source": "rule-based",
             }
+
+    # If incident context AND question is asking about the incident specifically → incident analysis
+    if incident and any(w in msg_lower for w in ["this incident", "this event", "what happened", "analyze", "analyse", "tell me about"]):
+        result = analyze_incident(incident)
+        result["incident_context"] = incident_context_payload
+        result["source"] = "rule-based"
+        return result
+
+    # If incident context but question is general → still answer the question, append incident context
+    if incident and not any(d.lower() in msg_lower for d in ["plc", "rtu", "hmi", "gateway", "sensor"]):
+        kb = _match_knowledge(message)
+        if kb != KNOWLEDGE_BASE["general"]:
+            # Specific threat matched — answer the question with incident as extra context
+            inc_note = (f"\n\n📋 **Related to incident**: {incident.get('title')} "
+                        f"({incident.get('severity','').upper()}, Risk: {incident.get('risk_score',0)})")
+            if any(w in msg_lower for w in ["how", "steps", "should i", "respond", "handle"]):
+                answer = f"**Response Procedure**\n\n{kb['analysis']}\n\nFollow the steps below.{inc_note}"
+            else:
+                answer = f"**Threat Analysis**\n\n{kb['analysis']}\n\n⚠️ {kb['severity_note']}{inc_note}"
+            return {
+                "answer": answer,
+                "recommendations": kb["recommendations"],
+                "references": kb["references"],
+                "severity_assessment": kb.get("severity_note"),
+                "incident_context": incident_context_payload,
+                "source": "rule-based",
+            }
+        else:
+            # No specific keyword match — fall through to incident analysis
+            result = analyze_incident(incident)
+            result["incident_context"] = incident_context_payload
+            result["source"] = "rule-based"
+            return result
 
     # Device-specific question
     if any(d.lower() in msg_lower for d in ["plc", "rtu", "hmi", "gateway", "sensor"]):
