@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     devices_table: str = "otsentinel-prod-devices"
     incidents_table: str = "otsentinel-prod-incidents"
     audit_table: str = "otsentinel-prod-audit"
+    metrics_table: str = "otsentinel-prod-metrics"
     jwt_secret: str = "dev-secret-change-in-prod"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 480

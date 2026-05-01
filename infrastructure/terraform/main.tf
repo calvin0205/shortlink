@@ -74,6 +74,8 @@ module "api" {
   incidents_table_arn  = module.storage.incidents_table_arn
   audit_table_name     = module.storage.audit_table_name
   audit_table_arn      = module.storage.audit_table_arn
+  metrics_table_name   = module.storage.metrics_table_name
+  metrics_table_arn    = module.storage.metrics_table_arn
 }
 
 module "frontend" {

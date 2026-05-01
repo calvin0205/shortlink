@@ -6,3 +6,5 @@ output "incidents_table_name" { value = aws_dynamodb_table.incidents.name }
 output "incidents_table_arn"  { value = aws_dynamodb_table.incidents.arn }
 output "audit_table_name"     { value = aws_dynamodb_table.audit.name }
 output "audit_table_arn"      { value = aws_dynamodb_table.audit.arn }
+output "metrics_table_name"   { value = aws_dynamodb_table.metrics.name }
+output "metrics_table_arn"    { value = aws_dynamodb_table.metrics.arn }

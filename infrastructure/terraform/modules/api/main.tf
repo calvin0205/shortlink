@@ -104,10 +104,12 @@ resource "aws_iam_role_policy" "dynamo" {
         var.devices_table_arn,
         var.incidents_table_arn,
         var.audit_table_arn,
+        var.metrics_table_arn,
         "${var.users_table_arn}/index/*",
         "${var.devices_table_arn}/index/*",
         "${var.incidents_table_arn}/index/*",
         "${var.audit_table_arn}/index/*",
+        "${var.metrics_table_arn}/index/*",
       ]
     }]
   })
@@ -131,6 +133,7 @@ resource "aws_lambda_function" "api" {
       DEVICES_TABLE   = var.devices_table_name
       INCIDENTS_TABLE = var.incidents_table_name
       AUDIT_TABLE     = var.audit_table_name
+      METRICS_TABLE   = var.metrics_table_name
       JWT_SECRET      = var.jwt_secret
       AWS_REGION_NAME = var.aws_region
       BASE_URL        = var.base_url
@@ -203,4 +206,27 @@ resource "aws_lambda_permission" "apigw" {
   function_name = aws_lambda_function.api.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*"
+}
+
+# ── EventBridge heartbeat scheduler ──────────────────────────────────────────
+
+resource "aws_cloudwatch_event_rule" "heartbeat" {
+  name                = "${var.prefix}-heartbeat"
+  description         = "Triggers device heartbeat simulation every 5 minutes"
+  schedule_expression = "rate(5 minutes)"
+  tags                = var.tags
+}
+
+resource "aws_cloudwatch_event_target" "heartbeat" {
+  rule      = aws_cloudwatch_event_rule.heartbeat.name
+  target_id = "lambda-heartbeat"
+  arn       = aws_lambda_function.api.arn
+}
+
+resource "aws_lambda_permission" "eventbridge" {
+  statement_id  = "AllowEventBridgeInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.api.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.heartbeat.arn
 }

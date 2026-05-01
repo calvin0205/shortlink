@@ -121,6 +121,30 @@
     </div>
   </div>
 
+  <!-- Metrics Chart Modal -->
+  <div id="metrics-modal" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="closeMetricsModal()"></div>
+    <div class="modal-card" style="width:700px;max-width:95vw">
+      <div class="modal-header">
+        <h3>📈 Device Metrics — <span id="metrics-modal-device-name"></span></h3>
+        <button onclick="closeMetricsModal()" class="btn btn-ghost">✕</button>
+      </div>
+      <div class="modal-body" style="padding-bottom:20px">
+        <div id="metrics-chart-area">
+          <div class="empty-state" id="metrics-loading">
+            <div class="empty-state-icon">⏳</div>Loading metrics…
+          </div>
+          <canvas id="metrics-chart" style="display:none;max-height:320px"></canvas>
+          <div class="empty-state" id="metrics-empty" style="display:none">
+            <div class="empty-state-icon">📭</div>
+            No metrics available yet — data populates every 5 minutes
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="/static/app.js"></script>
   <script src="/static/devices.js"></script>
 </body>

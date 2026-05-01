@@ -159,8 +159,125 @@ function renderCharts(summary) {
   }
 }
 
-// Load on page ready
-loadDashboard();
+// ── In-place chart update (avoids destroy/recreate flicker) ───────────────────
 
-// Auto-refresh every 30 seconds
-setInterval(loadDashboard, 30000);
+function updateChartsInPlace(summary) {
+  if (deviceChart) {
+    deviceChart.data.datasets[0].data = [
+      summary.online_devices || 0,
+      summary.warning_devices || 0,
+      summary.critical_devices || 0,
+      summary.offline_devices || 0,
+    ];
+    deviceChart.update("none");
+  } else {
+    // Charts not yet created — fall through to full renderCharts
+    renderCharts(summary);
+    return;
+  }
+
+  apiFetch("/api/incidents").then((incidents) => {
+    const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+    incidents.forEach((inc) => {
+      const s = (inc.severity || "").toLowerCase();
+      if (Object.prototype.hasOwnProperty.call(counts, s)) counts[s]++;
+    });
+    if (severityChart) {
+      severityChart.data.datasets[0].data = [
+        counts.critical,
+        counts.high,
+        counts.medium,
+        counts.low,
+      ];
+      severityChart.update("none");
+    }
+  }).catch(() => {});
+}
+
+// ── Last-updated indicator ────────────────────────────────────────────────────
+
+let _lastUpdatedAt = Date.now();
+
+function setLastUpdatedNow() {
+  _lastUpdatedAt = Date.now();
+  const el = document.getElementById("last-updated-indicator");
+  if (el) el.textContent = "↻ Updated just now";
+}
+
+function startLastUpdatedTicker() {
+  setInterval(() => {
+    const el = document.getElementById("last-updated-indicator");
+    if (!el) return;
+    const secs = Math.floor((Date.now() - _lastUpdatedAt) / 1000);
+    el.textContent = secs < 5 ? "↻ Updated just now" : `↻ ${secs}s ago`;
+  }, 1000);
+}
+
+// Inject the indicator into the header bar between the <h2> and the user info
+setTimeout(() => {
+  const header = document.querySelector(".header");
+  if (header && !document.getElementById("last-updated-indicator")) {
+    const el = document.createElement("span");
+    el.id = "last-updated-indicator";
+    el.className = "last-updated";
+    // Parent is a flex row; override float and use flex ordering instead
+    el.style.cssText = "font-size:0.75rem;color:var(--text-secondary);margin-left:auto;margin-right:16px;align-self:center;float:none";
+    el.textContent = "↻ Updated just now";
+    const userInfo = header.querySelector(".user-info");
+    if (userInfo) {
+      header.insertBefore(el, userInfo);
+    } else {
+      header.appendChild(el);
+    }
+  }
+  startLastUpdatedTicker();
+}, 0);
+
+// ── Polling ───────────────────────────────────────────────────────────────────
+
+const POLL_INTERVAL = 30000;
+let _pollTimer = null;
+
+async function refreshDashboard() {
+  try {
+    const summary = await apiFetch("/api/dashboard/summary");
+    renderStats(summary);
+    renderRecentIncidents(summary.recent_incidents || []);
+    updateChartsInPlace(summary);
+    setLastUpdatedNow();
+  } catch (err) {
+    if (err.status !== 401) {
+      showToast("Failed to load dashboard data: " + err.message, "error");
+    }
+  }
+}
+
+function startPolling() {
+  if (_pollTimer) return;
+  _pollTimer = setInterval(refreshDashboard, POLL_INTERVAL);
+}
+
+function stopPolling() {
+  if (_pollTimer) {
+    clearInterval(_pollTimer);
+    _pollTimer = null;
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    stopPolling();
+  } else {
+    // Immediately re-fetch when tab becomes visible again, then resume polling
+    refreshDashboard();
+    startPolling();
+  }
+});
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+
+loadDashboard().then(() => {
+  setLastUpdatedNow();
+});
+
+startPolling();

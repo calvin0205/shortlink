@@ -121,4 +121,73 @@ document.querySelectorAll(".filter-btn").forEach((btn) => {
   });
 });
 
-loadIncidents();
+// ── Last-updated indicator ────────────────────────────────────────────────────
+
+let _lastUpdatedAt = Date.now();
+
+function setLastUpdatedNow() {
+  _lastUpdatedAt = Date.now();
+  const el = document.getElementById("last-updated-indicator");
+  if (el) el.textContent = "↻ Updated just now";
+}
+
+function startLastUpdatedTicker() {
+  setInterval(() => {
+    const el = document.getElementById("last-updated-indicator");
+    if (!el) return;
+    const secs = Math.floor((Date.now() - _lastUpdatedAt) / 1000);
+    el.textContent = secs < 5 ? "↻ Updated just now" : `↻ ${secs}s ago`;
+  }, 1000);
+}
+
+// Inject indicator into the .card-header alongside the existing incident-count span
+setTimeout(() => {
+  const cardHeader = document.querySelector(".card-header");
+  if (cardHeader && !document.getElementById("last-updated-indicator")) {
+    const el = document.createElement("span");
+    el.id = "last-updated-indicator";
+    el.className = "last-updated";
+    el.textContent = "↻ Updated just now";
+    cardHeader.appendChild(el);
+  }
+  startLastUpdatedTicker();
+}, 0);
+
+// ── Polling ───────────────────────────────────────────────────────────────────
+
+const POLL_INTERVAL = 30000;
+let _pollTimer = null;
+
+async function refreshIncidents() {
+  await loadIncidents();
+  setLastUpdatedNow();
+}
+
+function startPolling() {
+  if (_pollTimer) return;
+  _pollTimer = setInterval(refreshIncidents, POLL_INTERVAL);
+}
+
+function stopPolling() {
+  if (_pollTimer) {
+    clearInterval(_pollTimer);
+    _pollTimer = null;
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    stopPolling();
+  } else {
+    refreshIncidents();
+    startPolling();
+  }
+});
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+
+loadIncidents().then(() => {
+  setLastUpdatedNow();
+});
+
+startPolling();

@@ -105,6 +105,31 @@ resource "aws_dynamodb_table" "incidents" {
   }
 }
 
+# Metrics table (device telemetry time-series, 7-day TTL)
+resource "aws_dynamodb_table" "metrics" {
+  name         = "${var.prefix}-metrics"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "PK"
+  range_key    = "ts"
+  tags = merge(var.tags, {
+    Description = "OT Sentinel device metrics time-series with 7-day TTL"
+  })
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+  attribute {
+    name = "ts"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
+}
+
 # Audit table
 resource "aws_dynamodb_table" "audit" {
   name         = "${var.prefix}-audit"

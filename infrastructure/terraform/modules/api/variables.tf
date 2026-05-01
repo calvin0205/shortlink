@@ -11,6 +11,8 @@ variable "incidents_table_name" { type = string }
 variable "incidents_table_arn"  { type = string }
 variable "audit_table_name"     { type = string }
 variable "audit_table_arn"      { type = string }
+variable "metrics_table_name"   { type = string }
+variable "metrics_table_arn"    { type = string }
 
 variable "jwt_secret" {
   description = "JWT signing secret for authentication"

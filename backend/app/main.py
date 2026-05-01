@@ -12,6 +12,7 @@ from .routes import audit as audit_router
 from .routes import simulate as simulate_router
 from .routes import admin as admin_router
 from .routes import assistant as assistant_router
+from .routes import metrics as metrics_router
 
 app = FastAPI(
     title="OT Sentinel",
@@ -62,6 +63,9 @@ app.include_router(auth.router)
 # simulate router must be included BEFORE devices router to avoid path collision
 # (/api/devices/anomaly-types would be captured as {device_id} otherwise)
 app.include_router(simulate_router.router)
+# metrics router must be included BEFORE devices router so /{device_id}/metrics
+# is not shadowed by the /{device_id} catch-all in the devices router
+app.include_router(metrics_router.router)
 app.include_router(devices.router)
 app.include_router(incidents.router)
 app.include_router(dashboard.router)
@@ -106,4 +110,13 @@ def serve_frontend(full_path: str = ""):
 
 
 # AWS Lambda entry point
-handler = Mangum(app, lifespan="off")
+_mangum = Mangum(app, lifespan="off")
+
+
+def handler(event, context):
+    # EventBridge scheduled events carry source="aws.events"
+    if event.get("source") == "aws.events":
+        from app.simulator import run_heartbeat
+        result = run_heartbeat()
+        return {"statusCode": 200, "body": str(result)}
+    return _mangum(event, context)
