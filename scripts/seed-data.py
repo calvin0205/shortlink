@@ -220,52 +220,67 @@ def seed_users(resource):
     return created_users
 
 
+# ── Table purge helpers ────────────────────────────────────────────────────────
+
+def _purge_table(table):
+    """Delete all items from a DynamoDB table using scan + batch_writer."""
+    key_names = [s["AttributeName"] for s in table.key_schema]
+    scan_kwargs = {}
+    deleted = 0
+    while True:
+        resp = table.scan(**scan_kwargs)
+        items = resp.get("Items", [])
+        if items:
+            with table.batch_writer() as batch:
+                for item in items:
+                    key = {k: item[k] for k in key_names}
+                    batch.delete_item(Key=key)
+            deleted += len(items)
+        last = resp.get("LastEvaluatedKey")
+        if not last:
+            break
+        scan_kwargs["ExclusiveStartKey"] = last
+    return deleted
+
+
 # ── Seed devices ───────────────────────────────────────────────────────────────
 
 def seed_devices(resource):
     print("\n[3] Seeding devices...")
     table = resource.Table(DEVICES_TABLE)
 
-    # Check if devices already exist
-    resp = table.scan(Limit=1)
-    if resp.get("Items"):
-        print("  WARNING: Devices already exist, skipping seed.")
-        resp_all = table.scan()
-        return resp_all.get("Items", [])
+    deleted = _purge_table(table)
+    if deleted:
+        print(f"  Deleted {deleted} existing device(s).")
 
     now = datetime.now(timezone.utc)
 
+    # Fab 18 — Tainan  /  single-fab bay-level layout
     devices_data = [
-        {"name": "PLC-001", "type": "PLC", "site_id": "site-a", "site_name": "Site Alpha",
-         "status": "online", "ip": "192.168.10.1", "firmware": "v2.1.0", "risk_score": 15,
-         "last_seen_offset_minutes": 2},
-        {"name": "HMI-Floor2", "type": "HMI", "site_id": "site-a", "site_name": "Site Alpha",
-         "status": "online", "ip": "192.168.10.2", "firmware": "v3.0.1", "risk_score": 8,
-         "last_seen_offset_minutes": 5},
-        {"name": "RTU-Pump3", "type": "RTU", "site_id": "site-b", "site_name": "Site Beta",
-         "status": "warning", "ip": "192.168.10.3", "firmware": "v1.5.3", "risk_score": 55,
-         "last_seen_offset_minutes": 15},
-        {"name": "Sensor-Temp4", "type": "Sensor", "site_id": "site-b", "site_name": "Site Beta",
-         "status": "online", "ip": "192.168.10.4", "firmware": "v2.8.0", "risk_score": 12,
-         "last_seen_offset_minutes": 1},
-        {"name": "Gateway-Main", "type": "Gateway", "site_id": "site-a", "site_name": "Site Alpha",
-         "status": "online", "ip": "192.168.10.5", "firmware": "v3.2.1", "risk_score": 20,
-         "last_seen_offset_minutes": 3},
-        {"name": "PLC-002", "type": "PLC", "site_id": "site-c", "site_name": "Site Gamma",
-         "status": "online", "ip": "192.168.10.6", "firmware": "v2.1.0", "risk_score": 18,
-         "last_seen_offset_minutes": 8},
-        {"name": "RTU-Valve6", "type": "RTU", "site_id": "site-c", "site_name": "Site Gamma",
-         "status": "critical", "ip": "192.168.10.7", "firmware": "v1.5.3", "risk_score": 88,
-         "last_seen_offset_minutes": 45},
-        {"name": "HMI-Control7", "type": "HMI", "site_id": "site-b", "site_name": "Site Beta",
-         "status": "offline", "ip": "192.168.10.8", "firmware": "v3.0.1", "risk_score": 0,
-         "last_seen_offset_minutes": 1440},
-        {"name": "Sensor-Press8", "type": "Sensor", "site_id": "site-a", "site_name": "Site Alpha",
-         "status": "online", "ip": "192.168.10.9", "firmware": "v2.8.0", "risk_score": 22,
-         "last_seen_offset_minutes": 4},
-        {"name": "Gateway-Backup", "type": "Gateway", "site_id": "site-c", "site_name": "Site Gamma",
-         "status": "warning", "ip": "192.168.10.10", "firmware": "v3.2.1", "risk_score": 47,
-         "last_seen_offset_minutes": 120},
+        # Bay 1 — Lithography Bay
+        {"name": "EUV-Scanner-01",   "type": "PLC",     "bay_id": "bay1",   "bay_name": "Lithography Bay",
+         "status": "online",   "ip": "10.1.1.11", "firmware": "EUV-FW-4.2.1",  "risk_score": 72, "last_seen_offset_minutes": 1},
+        {"name": "ArF-Immersion-01", "type": "PLC",     "bay_id": "bay1",   "bay_name": "Lithography Bay",
+         "status": "online",   "ip": "10.1.1.12", "firmware": "ArF-FW-3.8.0",  "risk_score": 65, "last_seen_offset_minutes": 2},
+        # Bay 2 — Thin Film Bay
+        {"name": "CVD-Chamber-A",    "type": "PLC",     "bay_id": "bay2",   "bay_name": "Thin Film Bay",
+         "status": "warning",  "ip": "10.2.1.11", "firmware": "CVD-FW-2.5.3",  "risk_score": 61, "last_seen_offset_minutes": 10},
+        {"name": "ALD-System-01",    "type": "RTU",     "bay_id": "bay2",   "bay_name": "Thin Film Bay",
+         "status": "online",   "ip": "10.2.1.12", "firmware": "ALD-FW-1.9.7",  "risk_score": 45, "last_seen_offset_minutes": 3},
+        {"name": "PECVD-Chamber-B",  "type": "PLC",     "bay_id": "bay2",   "bay_name": "Thin Film Bay",
+         "status": "online",   "ip": "10.2.1.13", "firmware": "PECVD-FW-2.1.0","risk_score": 38, "last_seen_offset_minutes": 4},
+        # Bay 3 — Etch Bay
+        {"name": "Dry-Etch-01",      "type": "RTU",     "bay_id": "bay3",   "bay_name": "Etch Bay",
+         "status": "online",   "ip": "10.3.1.11", "firmware": "ETCH-FW-3.3.2", "risk_score": 42, "last_seen_offset_minutes": 2},
+        {"name": "Dry-Etch-02",      "type": "RTU",     "bay_id": "bay3",   "bay_name": "Etch Bay",
+         "status": "critical", "ip": "10.3.1.12", "firmware": "ETCH-FW-3.3.2", "risk_score": 88, "last_seen_offset_minutes": 30},
+        # Sub-Fab Utilities
+        {"name": "Chiller-Main",     "type": "Gateway", "bay_id": "subfab", "bay_name": "Sub-Fab Utilities",
+         "status": "online",   "ip": "10.0.1.11", "firmware": "CHILL-FW-1.4.0","risk_score": 30, "last_seen_offset_minutes": 1},
+        {"name": "UPW-System-01",    "type": "Gateway", "bay_id": "subfab", "bay_name": "Sub-Fab Utilities",
+         "status": "online",   "ip": "10.0.1.12", "firmware": "UPW-FW-2.0.1",  "risk_score": 28, "last_seen_offset_minutes": 1},
+        {"name": "N2-Gas-Supply",    "type": "Sensor",  "bay_id": "subfab", "bay_name": "Sub-Fab Utilities",
+         "status": "warning",  "ip": "10.0.1.13", "firmware": "GAS-FW-1.1.5",  "risk_score": 55, "last_seen_offset_minutes": 20},
     ]
 
     created_devices = []
@@ -277,8 +292,10 @@ def seed_devices(resource):
             "device_id": device_id,
             "name": d["name"],
             "type": d["type"],
-            "site_id": d["site_id"],
-            "site_name": d["site_name"],
+            "site_id": "fab18",
+            "site_name": "Fab 18 — Tainan",
+            "bay_id": d["bay_id"],
+            "bay_name": d["bay_name"],
             "status": d["status"],
             "ip_address": d["ip"],
             "firmware_version": d["firmware"],
@@ -287,7 +304,7 @@ def seed_devices(resource):
         }
         table.put_item(Item=item)
         created_devices.append(item)
-        print(f"  Created device: {d['name']} ({d['type']}, {d['status']})")
+        print(f"  Created device: {d['name']} ({d['type']}, {d['status']}, {d['bay_id']})")
 
     return created_devices
 
@@ -298,68 +315,99 @@ def seed_incidents(resource, devices):
     print("\n[4] Seeding incidents...")
     table = resource.Table(INCIDENTS_TABLE)
 
-    # Check if incidents already exist
-    resp = table.scan(Limit=1)
-    if resp.get("Items"):
-        print("  WARNING: Incidents already exist, skipping seed.")
-        return
+    deleted = _purge_table(table)
+    if deleted:
+        print(f"  Deleted {deleted} existing incident(s).")
 
     now = datetime.now(timezone.utc)
 
-    # Get device IDs and names for linking
-    device_pool = [(d["device_id"], d["name"]) for d in devices[:10]]
+    # Build name -> (device_id, name) lookup for deterministic assignment
+    device_by_name = {d["name"]: (d["device_id"], d["name"]) for d in devices}
+    device_pool = list(device_by_name.values())
+
+    def _dev(name):
+        return device_by_name.get(name, device_pool[0])
 
     incidents_data = [
-        {"title": "Unauthorized access attempt", "severity": "critical", "status": "open",
-         "description": "Multiple failed authentication attempts detected from unknown IP address.",
-         "risk_score": 92, "days_ago": 0},
-        {"title": "Abnormal temperature spike", "severity": "high", "status": "investigating",
-         "description": "Temperature sensor reporting values 40% above normal operating range.",
-         "risk_score": 71, "days_ago": 1},
-        {"title": "Firmware version mismatch", "severity": "medium", "status": "open",
-         "description": "Device firmware version does not match approved baseline configuration.",
-         "risk_score": 45, "days_ago": 2},
-        {"title": "Communication timeout", "severity": "low", "status": "resolved",
-         "description": "Periodic communication timeouts detected on primary network interface.",
-         "risk_score": 18, "days_ago": 3},
-        {"title": "Protocol anomaly detected", "severity": "critical", "status": "open",
-         "description": "Non-standard Modbus commands observed on industrial control network.",
+        # EUV-Scanner-01 (risk 72, online)
+        {"device": "EUV-Scanner-01", "title": "EUV source power fluctuation detected",
+         "severity": "high", "status": "investigating",
+         "description": "EUV plasma source output dropped 18% below set-point; dose uniformity at risk.",
+         "risk_score": 74, "days_ago": 0},
+        # ArF-Immersion-01 (risk 65, online)
+        {"device": "ArF-Immersion-01", "title": "Immersion hood leak — water contamination alert",
+         "severity": "critical", "status": "open",
+         "description": "Fluid sensor detected trace DI water ingress near wafer stage; process suspended.",
+         "risk_score": 91, "days_ago": 0},
+        # CVD-Chamber-A (risk 61, warning)
+        {"device": "CVD-Chamber-A", "title": "CVD precursor flow rate out of spec",
+         "severity": "high", "status": "open",
+         "description": "MFC reading for TEOS precursor is 12% above recipe limit; film thickness deviation expected.",
+         "risk_score": 67, "days_ago": 1},
+        # CVD-Chamber-A second incident
+        {"device": "CVD-Chamber-A", "title": "Unauthorized recipe parameter change",
+         "severity": "critical", "status": "open",
+         "description": "CVD process recipe modified outside change-control window by unrecognized user session.",
          "risk_score": 95, "days_ago": 0},
-        {"title": "Unusual network traffic", "severity": "high", "status": "open",
-         "description": "Device initiating outbound connections to unrecognized external hosts.",
-         "risk_score": 78, "days_ago": 1},
-        {"title": "Device configuration changed", "severity": "high", "status": "investigating",
-         "description": "PLC configuration parameters modified outside of scheduled maintenance window.",
-         "risk_score": 82, "days_ago": 2},
-        {"title": "Multiple login failures", "severity": "medium", "status": "resolved",
-         "description": "10 consecutive failed login attempts recorded within 60-second window.",
-         "risk_score": 50, "days_ago": 4},
-        {"title": "Memory overflow warning", "severity": "medium", "status": "open",
-         "description": "Device memory utilization exceeded 90% threshold for extended period.",
-         "risk_score": 42, "days_ago": 1},
-        {"title": "Unexpected device reboot", "severity": "high", "status": "investigating",
-         "description": "Device rebooted unexpectedly during active production cycle.",
-         "risk_score": 68, "days_ago": 0},
-        {"title": "PLC ladder logic modified", "severity": "critical", "status": "open",
-         "description": "Unauthorized modification of PLC ladder logic program detected.",
-         "risk_score": 98, "days_ago": 0},
-        {"title": "HMI display tampering", "severity": "medium", "status": "resolved",
-         "description": "Suspicious modifications to HMI display configuration detected.",
-         "risk_score": 38, "days_ago": 5},
-        {"title": "Network scan detected", "severity": "low", "status": "resolved",
-         "description": "Port scan originating from within OT network segment detected.",
-         "risk_score": 22, "days_ago": 6},
-        {"title": "Sensor data manipulation", "severity": "critical", "status": "investigating",
-         "description": "Sensor readings show signs of spoofing or signal injection attack.",
-         "risk_score": 90, "days_ago": 0},
-        {"title": "VPN tunnel disruption", "severity": "low", "status": "resolved",
-         "description": "Intermittent VPN tunnel drops causing brief connectivity gaps.",
-         "risk_score": 15, "days_ago": 7},
+        # ALD-System-01 (risk 45, online)
+        {"device": "ALD-System-01", "title": "ALD cycle count mismatch",
+         "severity": "medium", "status": "open",
+         "description": "Reported cycle count diverges from expected value by 3 cycles; potential underfill.",
+         "risk_score": 48, "days_ago": 2},
+        # PECVD-Chamber-B (risk 38, online)
+        {"device": "PECVD-Chamber-B", "title": "RF power matching network alarm",
+         "severity": "medium", "status": "investigating",
+         "description": "Impedance mismatch on 13.56 MHz RF network causing reflected power spikes.",
+         "risk_score": 41, "days_ago": 1},
+        # Dry-Etch-01 (risk 42, online)
+        {"device": "Dry-Etch-01", "title": "Etch endpoint detection timeout",
+         "severity": "medium", "status": "resolved",
+         "description": "OES endpoint signal did not clear within defined window; lot held for metrology review.",
+         "risk_score": 44, "days_ago": 3},
+        # Dry-Etch-02 (risk 88, critical)
+        {"device": "Dry-Etch-02", "title": "Dry etch chamber pressure spike — process abort",
+         "severity": "critical", "status": "open",
+         "description": "Chamber pressure jumped to 850 mTorr during over-etch step; automatic safety interlock triggered.",
+         "risk_score": 92, "days_ago": 0},
+        {"device": "Dry-Etch-02", "title": "Anomalous Modbus write to etch PLC",
+         "severity": "critical", "status": "investigating",
+         "description": "Non-standard Modbus FC 16 command with unknown register range observed on OT network segment.",
+         "risk_score": 97, "days_ago": 0},
+        # Dry-Etch-02 third incident
+        {"device": "Dry-Etch-02", "title": "Etch rate drift — CD uniformity degraded",
+         "severity": "high", "status": "investigating",
+         "description": "In-situ etch rate dropped 9% over last 8 wafers; critical dimension uniformity out of spec.",
+         "risk_score": 80, "days_ago": 1},
+        # Chiller-Main (risk 30, online)
+        {"device": "Chiller-Main", "title": "Chiller coolant temperature above set-point",
+         "severity": "low", "status": "resolved",
+         "description": "Chiller outlet temperature drifted +1.2 °C above set-point; process tools self-corrected.",
+         "risk_score": 22, "days_ago": 4},
+        # UPW-System-01 (risk 28, online)
+        {"device": "UPW-System-01", "title": "UPW resistivity drop detected",
+         "severity": "medium", "status": "resolved",
+         "description": "UPW resistivity fell to 17.8 MΩ·cm (threshold 18.2); DI polisher regeneration triggered.",
+         "risk_score": 35, "days_ago": 5},
+        # N2-Gas-Supply (risk 55, warning)
+        {"device": "N2-Gas-Supply", "title": "N2 supply pressure below minimum threshold",
+         "severity": "high", "status": "open",
+         "description": "Nitrogen header pressure reading 5.8 bar; minimum for fab operations is 6.0 bar.",
+         "risk_score": 72, "days_ago": 0},
+        # EUV-Scanner-01 second incident
+        {"device": "EUV-Scanner-01", "title": "Reticle stage position error",
+         "severity": "medium", "status": "resolved",
+         "description": "Reticle stage reported 15 nm position error outside overlay budget during PM validation.",
+         "risk_score": 50, "days_ago": 6},
+        # ALD-System-01 second incident
+        {"device": "ALD-System-01", "title": "Precursor valve firmware version mismatch",
+         "severity": "low", "status": "resolved",
+         "description": "ALD precursor valve controller firmware does not match approved baseline v1.9.7.",
+         "risk_score": 18, "days_ago": 7},
     ]
 
-    for idx, inc in enumerate(incidents_data):
+    for inc in incidents_data:
         incident_id = str(uuid.uuid4())
-        device_id, device_name = device_pool[idx % len(device_pool)]
+        device_id, device_name = _dev(inc["device"])
         created_at = (now - timedelta(days=inc["days_ago"])).isoformat()
         resolved_at = None
         if inc["status"] == "resolved":
@@ -390,11 +438,9 @@ def seed_audit_logs(resource, users):
     print("\n[5] Seeding audit logs...")
     table = resource.Table(AUDIT_TABLE)
 
-    # Check if audit logs already exist
-    resp = table.scan(Limit=1)
-    if resp.get("Items"):
-        print("  WARNING: Audit logs already exist, skipping seed.")
-        return
+    deleted = _purge_table(table)
+    if deleted:
+        print(f"  Deleted {deleted} existing audit log(s).")
 
     now = datetime.now(timezone.utc)
 

@@ -11,10 +11,11 @@ router = APIRouter(prefix="/api/devices", tags=["devices"])
 @router.get("")
 async def get_devices(
     status: Optional[str] = Query(None),
+    bay_id: Optional[str] = Query(None),
     current_user=Depends(get_current_user),
 ):
-    """List all OT/IoT devices. Optionally filter by status (online, offline, warning, critical)."""
-    devices = list_devices(status_filter=status)
+    """List all OT/IoT devices. Optionally filter by status (online, offline, warning, critical) and/or bay_id."""
+    devices = list_devices(status_filter=status, bay_id=bay_id)
     return devices
 
 

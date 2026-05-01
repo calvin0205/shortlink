@@ -35,6 +35,26 @@ function renderStats(summary) {
   el("stat-active-incidents", summary.active_incidents);
   el("stat-critical-incidents", summary.critical_incidents);
   el("stat-avg-risk", summary.avg_risk_score);
+
+  renderBays(summary.bays);
+}
+
+function renderBays(bays) {
+  const grid = document.getElementById('bay-status-grid');
+  if (!grid || !bays) return;
+  grid.innerHTML = bays.map(bay => `
+    <div class="bay-card ${bay.status}">
+      <div class="bay-card-name">${bay.bay_name}</div>
+      <div class="bay-card-status ${bay.status}">${bay.status}</div>
+      <div class="bay-card-counts">
+        ${bay.online} online
+        ${bay.warning  > 0 ? ` · <span style="color:#f59e0b">${bay.warning} warn</span>`   : ''}
+        ${bay.critical > 0 ? ` · <span style="color:#ef4444">${bay.critical} crit</span>` : ''}
+        ${bay.offline  > 0 ? ` · <span style="color:#6b7280">${bay.offline} off</span>`   : ''}
+        / ${bay.total} total
+      </div>
+    </div>
+  `).join('');
 }
 
 function renderRecentIncidents(incidents) {

@@ -10,9 +10,17 @@ def _table():
     return get_resource().Table(settings.devices_table)
 
 
-def list_devices(status_filter: str = None) -> list:
+def list_devices(status_filter: str = None, bay_id: str = None) -> list:
+    filter_expr = None
+
     if status_filter:
-        resp = _table().scan(FilterExpression=Attr("status").eq(status_filter))
+        filter_expr = Attr("status").eq(status_filter)
+    if bay_id:
+        bay_expr = Attr("bay_id").eq(bay_id)
+        filter_expr = bay_expr if filter_expr is None else filter_expr & bay_expr
+
+    if filter_expr is not None:
+        resp = _table().scan(FilterExpression=filter_expr)
     else:
         resp = _table().scan()
     return resp.get("Items", [])

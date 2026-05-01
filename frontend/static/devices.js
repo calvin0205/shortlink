@@ -10,12 +10,18 @@ initPageHeader();
 
 let allDevices = [];
 let currentFilter = "all";
+let currentBayFilter = "";
 let _simulateDeviceId = null;
 
 async function loadDevices() {
   const tbody = document.getElementById("devices-body");
   try {
-    allDevices = await apiFetch("/api/devices");
+    let url = '/api/devices';
+    const params = new URLSearchParams();
+    if (currentFilter && currentFilter !== "all") params.set('status', currentFilter);
+    if (currentBayFilter) params.set('bay_id', currentBayFilter);
+    if (params.toString()) url += '?' + params.toString();
+    allDevices = await apiFetch(url);
     renderDevices(currentFilter);
   } catch (err) {
     if (err.status !== 401) {
@@ -62,6 +68,7 @@ function renderDevices(filter) {
           ${d.type || "—"}
         </span>
       </td>
+      <td class="text-secondary">${d.bay_name || "—"}</td>
       <td class="text-secondary">${d.site_name || d.site_id || "—"}</td>
       <td>${deviceStatusBadge(d.status)}</td>
       <td><span class="font-mono text-secondary">${d.ip_address || "—"}</span></td>
@@ -172,13 +179,23 @@ async function runSimulation() {
   }
 }
 
-// Filter button click handlers
-document.querySelectorAll(".filter-btn").forEach((btn) => {
+// Bay filter button click handlers
+document.querySelectorAll('#bay-filter-bar .filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#bay-filter-bar .filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentBayFilter = btn.dataset.bay;
+    loadDevices();
+  });
+});
+
+// Status filter button click handlers
+document.querySelectorAll(".filter-bar:not(#bay-filter-bar) .filter-btn").forEach((btn) => {
   btn.addEventListener("click", function () {
-    document.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".filter-bar:not(#bay-filter-bar) .filter-btn").forEach((b) => b.classList.remove("active"));
     this.classList.add("active");
     currentFilter = this.dataset.filter;
-    renderDevices(currentFilter);
+    loadDevices();
   });
 });
 

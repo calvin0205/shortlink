@@ -12,3 +12,5 @@ class DeviceResponse(BaseModel):
     firmware_version: str
     last_seen: str
     risk_score: int = 0
+    bay_id: str = ""
+    bay_name: str = ""

@@ -69,6 +69,7 @@ function renderIncidents(filter) {
     <tr>
       <td><span class="font-mono text-secondary">${shortId(inc.incident_id)}</span></td>
       <td>${inc.device_name || "—"}</td>
+      <td class="text-secondary" style="font-size:0.8rem">${inc.bay_name || "—"}</td>
       <td>${severityBadge(inc.severity)}</td>
       <td>${statusBadge(inc.status)}</td>
       <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${inc.title || ""}">

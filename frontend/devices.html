@@ -57,7 +57,17 @@
             <span id="device-count" class="text-secondary text-sm"></span>
           </div>
 
-          <!-- Filter Bar -->
+          <!-- Bay Filter Bar -->
+          <div class="filter-bar" id="bay-filter-bar">
+            <span class="filter-label">Bay:</span>
+            <button class="filter-btn active" data-bay="">All Bays</button>
+            <button class="filter-btn" data-bay="bay1">Lithography</button>
+            <button class="filter-btn" data-bay="bay2">Thin Film</button>
+            <button class="filter-btn" data-bay="bay3">Etch</button>
+            <button class="filter-btn" data-bay="subfab">Sub-Fab</button>
+          </div>
+
+          <!-- Status Filter Bar -->
           <div class="filter-bar">
             <button class="filter-btn active" data-filter="all">All</button>
             <button class="filter-btn" data-filter="online">Online</button>
@@ -72,6 +82,7 @@
                 <tr>
                   <th>Name</th>
                   <th>Type</th>
+                  <th>Bay</th>
                   <th>Site</th>
                   <th>Status</th>
                   <th>IP Address</th>
@@ -82,7 +93,7 @@
                 </tr>
               </thead>
               <tbody id="devices-body">
-                <tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">⏳</div>Loading devices…</div></td></tr>
+                <tr><td colspan="10"><div class="empty-state"><div class="empty-state-icon">⏳</div>Loading devices…</div></td></tr>
               </tbody>
             </table>
           </div>
