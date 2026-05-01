@@ -40,6 +40,38 @@ def record_metric(
     )
 
 
+def get_recent_metrics(device_id: str, n: int = 30) -> list[dict]:
+    """Return the most recent *n* metric readings for SPC baseline calculation.
+
+    Queries newest-first (ScanIndexForward=False) then reverses the result so
+    the returned list is chronological (oldest first) for baseline calculation.
+    """
+    resp = _table().query(
+        KeyConditionExpression=Key("PK").eq(f"DEVICE#{device_id}"),
+        ScanIndexForward=False,  # newest first
+        Limit=n,
+    )
+    items = resp.get("Items", [])
+
+    result = []
+    for item in items:
+        result.append(
+            {
+                "ts": item["ts"],
+                "cpu_pct": float(item["cpu_pct"]),
+                "mem_pct": float(item["mem_pct"]),
+                "temp_c": float(item["temp_c"]),
+                "net_in_kbps": float(item["net_in_kbps"]),
+                "net_out_kbps": float(item["net_out_kbps"]),
+                "risk_score": float(item["risk_score"]),
+            }
+        )
+
+    # Reverse so the list is chronological (oldest → newest)
+    result.reverse()
+    return result
+
+
 def get_device_metrics(device_id: str, hours: int = 24) -> list[dict]:
     """
     Return metric samples for *device_id* from the last *hours* hours,

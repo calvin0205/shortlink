@@ -260,13 +260,15 @@ let _metricsChart = null;
 
 function openMetricsModal(deviceId, deviceName) {
   const nameEl = document.getElementById("metrics-modal-device-name");
-  if (nameEl) nameEl.textContent = deviceName;
+  if (nameEl) nameEl.textContent = `📈 Metrics — ${deviceName}`;
 
   // Reset state
   document.getElementById("metrics-loading").style.display = "flex";
   document.getElementById("metrics-empty").style.display = "none";
   const canvas = document.getElementById("metrics-chart");
   canvas.style.display = "none";
+  const spcEl = document.getElementById("metrics-spc-status");
+  if (spcEl) { spcEl.style.display = "none"; spcEl.textContent = ""; }
 
   // Destroy previous chart instance if any
   if (_metricsChart) {
@@ -293,62 +295,168 @@ async function _fetchAndRenderMetrics(deviceId) {
 
     document.getElementById("metrics-loading").style.display = "none";
 
-    if (!data || data.length === 0) {
+    // Parse new response shape
+    const metrics   = data.metrics   ?? [];
+    const baselines = data.baselines ?? {};
+
+    if (data.metrics.length === 0) {
       document.getElementById("metrics-empty").style.display = "flex";
       return;
+    }
+
+    // ── SPC status text ──────────────────────────────────────────────────────
+    const spcEl = document.getElementById("metrics-spc-status");
+    if (spcEl) {
+      const cpuB  = baselines.cpu_pct    ?? {};
+      const tmpB  = baselines.temp_c     ?? {};
+      const rskB  = baselines.risk_score ?? {};
+      const anyActive = cpuB.ucl !== null && cpuB.ucl !== undefined
+                     || tmpB.ucl !== null && tmpB.ucl !== undefined
+                     || rskB.ucl !== null && rskB.ucl !== undefined;
+
+      if (anyActive) {
+        // Use the n from whichever baseline is available
+        const n = cpuB.n ?? tmpB.n ?? rskB.n ?? "?";
+        const fmt = (v) => v != null ? v.toFixed(1) : "—";
+        spcEl.textContent =
+          `SPC Active — n=${n} readings` +
+          (cpuB.ucl != null ? ` | CPU: UCL ${fmt(cpuB.ucl)} / LCL ${fmt(cpuB.lcl)}` : "") +
+          (tmpB.ucl != null ? ` | Temp: UCL ${fmt(tmpB.ucl)} / LCL ${fmt(tmpB.lcl)}` : "");
+      } else {
+        spcEl.textContent = "SPC: Collecting baseline data (need 10+ readings)";
+      }
+      spcEl.style.display = "block";
     }
 
     const canvas = document.getElementById("metrics-chart");
     canvas.style.display = "block";
 
     // Format timestamps as HH:MM labels
-    const labels = data.map((m) => {
+    const labels = metrics.map((m) => {
       const d = new Date(m.ts);
       return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     });
 
-    const cpuData      = data.map((m) => m.cpu_pct);
-    const riskData     = data.map((m) => m.risk_score);
-    const tempData     = data.map((m) => m.temp_c);
+    const cpuData  = metrics.map((m) => m.cpu_pct);
+    const riskData = metrics.map((m) => m.risk_score);
+    const tempData = metrics.map((m) => m.temp_c);
+
+    // ── Build datasets, appending UCL/LCL fake datasets where available ──────
+    const datasets = [
+      {
+        label: "CPU %",
+        data: cpuData,
+        borderColor: "#3b82f6",
+        backgroundColor: "rgba(59,130,246,0.08)",
+        tension: 0.3,
+        fill: true,
+        yAxisID: "yLeft",
+        pointRadius: metrics.length > 50 ? 0 : 3,
+      },
+      {
+        label: "Risk Score",
+        data: riskData,
+        borderColor: "#ef4444",
+        backgroundColor: "rgba(239,68,68,0.08)",
+        tension: 0.3,
+        fill: false,
+        yAxisID: "yLeft",
+        borderDash: [4, 3],
+        pointRadius: metrics.length > 50 ? 0 : 3,
+      },
+      {
+        label: "Temp °C",
+        data: tempData,
+        borderColor: "#f59e0b",
+        backgroundColor: "rgba(245,158,11,0.08)",
+        tension: 0.3,
+        fill: false,
+        yAxisID: "yRight",
+        pointRadius: metrics.length > 50 ? 0 : 3,
+      },
+    ];
+
+    // cpu_pct UCL / LCL
+    if (baselines.cpu_pct && baselines.cpu_pct.ucl !== null && baselines.cpu_pct.ucl !== undefined) {
+      datasets.push({
+        label: "CPU UCL",
+        data: labels.map(() => baselines.cpu_pct.ucl),
+        borderColor: "rgba(255, 80, 80, 0.6)",
+        borderWidth: 1,
+        borderDash: [6, 3],
+        pointRadius: 0,
+        fill: false,
+        yAxisID: "yLeft",
+        tension: 0,
+      });
+      datasets.push({
+        label: "CPU LCL",
+        data: labels.map(() => baselines.cpu_pct.lcl),
+        borderColor: "rgba(255, 160, 50, 0.6)",
+        borderWidth: 1,
+        borderDash: [6, 3],
+        pointRadius: 0,
+        fill: false,
+        yAxisID: "yLeft",
+        tension: 0,
+      });
+    }
+
+    // temp_c UCL / LCL
+    if (baselines.temp_c && baselines.temp_c.ucl !== null && baselines.temp_c.ucl !== undefined) {
+      datasets.push({
+        label: "Temp UCL",
+        data: labels.map(() => baselines.temp_c.ucl),
+        borderColor: "rgba(255, 80, 80, 0.6)",
+        borderWidth: 1,
+        borderDash: [6, 3],
+        pointRadius: 0,
+        fill: false,
+        yAxisID: "yRight",
+        tension: 0,
+      });
+      datasets.push({
+        label: "Temp LCL",
+        data: labels.map(() => baselines.temp_c.lcl),
+        borderColor: "rgba(255, 160, 50, 0.6)",
+        borderWidth: 1,
+        borderDash: [6, 3],
+        pointRadius: 0,
+        fill: false,
+        yAxisID: "yRight",
+        tension: 0,
+      });
+    }
+
+    // risk_score UCL / LCL
+    if (baselines.risk_score && baselines.risk_score.ucl !== null && baselines.risk_score.ucl !== undefined) {
+      datasets.push({
+        label: "Risk UCL",
+        data: labels.map(() => baselines.risk_score.ucl),
+        borderColor: "rgba(255, 80, 80, 0.6)",
+        borderWidth: 1,
+        borderDash: [6, 3],
+        pointRadius: 0,
+        fill: false,
+        yAxisID: "yLeft",
+        tension: 0,
+      });
+      datasets.push({
+        label: "Risk LCL",
+        data: labels.map(() => baselines.risk_score.lcl),
+        borderColor: "rgba(255, 160, 50, 0.6)",
+        borderWidth: 1,
+        borderDash: [6, 3],
+        pointRadius: 0,
+        fill: false,
+        yAxisID: "yLeft",
+        tension: 0,
+      });
+    }
 
     _metricsChart = new Chart(canvas, {
       type: "line",
-      data: {
-        labels,
-        datasets: [
-          {
-            label: "CPU %",
-            data: cpuData,
-            borderColor: "#3b82f6",
-            backgroundColor: "rgba(59,130,246,0.08)",
-            tension: 0.3,
-            fill: true,
-            yAxisID: "yLeft",
-            pointRadius: data.length > 50 ? 0 : 3,
-          },
-          {
-            label: "Risk Score",
-            data: riskData,
-            borderColor: "#ef4444",
-            backgroundColor: "rgba(239,68,68,0.08)",
-            tension: 0.3,
-            fill: false,
-            yAxisID: "yLeft",
-            borderDash: [4, 3],
-            pointRadius: data.length > 50 ? 0 : 3,
-          },
-          {
-            label: "Temp °C",
-            data: tempData,
-            borderColor: "#f59e0b",
-            backgroundColor: "rgba(245,158,11,0.08)",
-            tension: 0.3,
-            fill: false,
-            yAxisID: "yRight",
-            pointRadius: data.length > 50 ? 0 : 3,
-          },
-        ],
-      },
+      data: { labels, datasets },
       options: {
         responsive: true,
         interaction: { mode: "index", intersect: false },

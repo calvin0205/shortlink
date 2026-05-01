@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 480
     dynamodb_endpoint_url: str | None = None
+    sns_topic_arn: str = ""
 
     class Config:
         env_file = ".env"

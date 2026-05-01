@@ -126,10 +126,11 @@
     <div class="modal-overlay" onclick="closeMetricsModal()"></div>
     <div class="modal-card" style="width:700px;max-width:95vw">
       <div class="modal-header">
-        <h3>📈 Device Metrics — <span id="metrics-modal-device-name"></span></h3>
+        <h3><span id="metrics-modal-device-name"></span></h3>
         <button onclick="closeMetricsModal()" class="btn btn-ghost">✕</button>
       </div>
       <div class="modal-body" style="padding-bottom:20px">
+        <div id="metrics-spc-status" style="display:none;font-size:0.75rem;color:#888;margin-bottom:8px"></div>
         <div id="metrics-chart-area">
           <div class="empty-state" id="metrics-loading">
             <div class="empty-state-icon">⏳</div>Loading metrics…

@@ -117,6 +117,8 @@ def handler(event, context):
     # EventBridge scheduled events carry source="aws.events"
     if event.get("source") == "aws.events":
         from app.simulator import run_heartbeat
-        result = run_heartbeat()
-        return {"statusCode": 200, "body": str(result)}
+        from app.escalation import check_escalations
+        heartbeat_result = run_heartbeat()
+        escalation_result = check_escalations()
+        return {"statusCode": 200, "body": str({**heartbeat_result, **escalation_result})}
     return _mangum(event, context)

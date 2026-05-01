@@ -5,22 +5,26 @@ Called by EventBridge on a 5-minute schedule. Scans all devices and:
   - Updates last_seen for non-offline devices
   - Applies small random risk_score drift (±5, clamped [5, 95])
   - Applies probabilistic status transitions
+  - Computes recipe-cycle-aware telemetry metrics (running/cooling/idle)
   - Creates incidents when a device degrades to a worse status
+  - Runs SPC violation checks and creates SPC incidents (max 1 per field per hour)
   - Writes a single audit log entry summarising the tick
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import random
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from .config import settings
 from .risk_engine import ANOMALY_TYPES, DEVICE_MULTIPLIERS
+from .spc import calculate_baseline, check_violations
 from .storage.base import get_resource
-from .storage.metrics import record_metric
+from .storage.metrics import get_recent_metrics, record_metric
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +99,28 @@ def _scan_all(table) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Recipe-cycle phase
+# ---------------------------------------------------------------------------
+def _get_recipe_phase(device_id: str, now: datetime) -> str:
+    """
+    Return 'running', 'cooling', or 'idle' based on device_id and current time.
+
+    Each device has a unique phase offset (derived from device_id hash) so
+    they don't all cycle in sync.
+
+    Cycle: 60 min = running(36 min) + cooling(6 min) + idle(18 min)
+    """
+    offset = int(hashlib.md5(device_id.encode()).hexdigest(), 16) % 60
+    minute = (now.minute + offset) % 60
+    if minute < 36:
+        return "running"
+    elif minute < 42:
+        return "cooling"
+    else:
+        return "idle"
+
+
+# ---------------------------------------------------------------------------
 # Core heartbeat logic
 # ---------------------------------------------------------------------------
 def run_heartbeat() -> dict:
@@ -112,6 +138,7 @@ def run_heartbeat() -> dict:
     audit_table = dynamodb.Table(settings.audit_table)
 
     now_iso = datetime.now(timezone.utc).isoformat()
+    now_dt = datetime.fromisoformat(now_iso)
 
     # Scan all device items (PK starts with "DEVICE#")
     all_items = _scan_all(devices_table)
@@ -119,6 +146,29 @@ def run_heartbeat() -> dict:
 
     updated_count = 0
     incidents_created = 0
+
+    # ------------------------------------------------------------------
+    # Build a set of (device_id, spc_field) pairs that already have an
+    # open SPC incident created within the last 60 minutes.
+    # This prevents SPC incident spam — max 1 per device+field per hour.
+    # ------------------------------------------------------------------
+    one_hour_ago_iso = (now_dt - timedelta(hours=1)).isoformat()
+    recent_spc_incidents: set[tuple[str, str]] = set()
+    try:
+        # Scan the incidents table for open SPC incidents in the last hour.
+        # We filter client-side to avoid a full scan needing a GSI.
+        all_incidents = _scan_all(incidents_table)
+        for inc in all_incidents:
+            if (
+                inc.get("source") == "spc"
+                and inc.get("status") == "open"
+                and inc.get("created_at", "") >= one_hour_ago_iso
+            ):
+                recent_spc_incidents.add(
+                    (inc.get("device_id", ""), inc.get("spc_field", ""))
+                )
+    except Exception:
+        logger.exception("Failed to scan recent SPC incidents; proceeding without spam guard")
 
     for device in devices:
         pk: str = device["PK"]
@@ -178,31 +228,35 @@ def run_heartbeat() -> dict:
             logger.exception("Failed to update device %s", device_id)
             continue
 
-        # ── record telemetry metrics ──────────────────────────────────────────
+        # ── record telemetry metrics (recipe-cycle aware) ─────────────────────
         try:
-            # Baseline ranges vary by status
-            if new_status == "critical":
-                cpu_base   = random.uniform(60, 80)
-                mem_base   = random.uniform(50, 70)
-                temp_base  = random.uniform(55, 75)
-                net_in     = random.uniform(200, 1200)
-                net_out    = random.uniform(100, 600)
-            elif new_status == "warning":
-                cpu_base   = random.uniform(40, 60)
-                mem_base   = random.uniform(40, 60)
-                temp_base  = random.uniform(45, 65)
-                net_in     = random.uniform(100, 800)
-                net_out    = random.uniform(50, 400)
-            else:  # online / offline
-                cpu_base   = random.uniform(20, 40)
-                mem_base   = random.uniform(30, 50)
-                temp_base  = random.uniform(35, 55)
-                net_in     = random.uniform(50, 500)
-                net_out    = random.uniform(20, 200)
+            recipe = _get_recipe_phase(device_id, now_dt)
 
-            cpu_pct  = max(0.0, min(100.0, cpu_base  + random.uniform(-10, 10)))
-            mem_pct  = max(0.0, min(100.0, mem_base  + random.uniform(-8,  8)))
-            temp_c   = max(20.0, min(95.0, temp_base + random.uniform(-5,  5)))
+            # Base ranges from recipe phase
+            if recipe == "running":
+                cpu_base = random.uniform(55, 80)
+                temp_base = random.uniform(58, 75)
+                net_in    = random.uniform(200, 800)
+                net_out   = random.uniform(100, 400)
+            elif recipe == "cooling":
+                cpu_base = random.uniform(20, 40)
+                temp_base = random.uniform(50, 65)
+                net_in    = random.uniform(50, 200)
+                net_out   = random.uniform(20, 100)
+            else:  # idle
+                cpu_base = random.uniform(10, 25)
+                temp_base = random.uniform(35, 50)
+                net_in    = random.uniform(10, 80)
+                net_out   = random.uniform(5, 40)
+
+            # Overlay device status (degraded devices run hotter/harder)
+            status_cpu_add  = {"online": 0, "warning": 15, "critical": 30, "offline": -50}.get(new_status, 0)
+            status_temp_add = {"online": 0, "warning": 8,  "critical": 18, "offline": -20}.get(new_status, 0)
+            status_mem_add  = {"online": 0, "warning": 10, "critical": 20, "offline": -10}.get(new_status, 0)
+
+            cpu_pct = max(0.0, min(100.0, cpu_base + status_cpu_add + random.uniform(-5, 5)))
+            mem_pct = max(0.0, min(100.0, random.uniform(35, 55) + status_mem_add + random.uniform(-5, 5)))
+            temp_c  = max(20.0, min(95.0, temp_base + status_temp_add + random.uniform(-3, 3)))
 
             record_metric(
                 device_id=device_id,
@@ -216,6 +270,90 @@ def run_heartbeat() -> dict:
             )
         except Exception:
             logger.exception("Failed to record metrics for device %s", device_id)
+            # Skip SPC check if we couldn't even record the metric
+            cpu_pct = 0.0
+            temp_c = 0.0
+
+        # ── SPC violation check ───────────────────────────────────────────────
+        try:
+            recent = get_recent_metrics(device_id, n=30)
+            if len(recent) >= 10:
+                current_vals = {
+                    "cpu_pct":    cpu_pct,
+                    "temp_c":     temp_c,
+                    "risk_score": float(new_risk),
+                }
+                spc_field_map = [
+                    ("cpu_pct",    "unusual_traffic"),
+                    ("temp_c",     "sensor_manipulation"),
+                    ("risk_score", "protocol_anomaly"),
+                ]
+                for field, anomaly_type in spc_field_map:
+                    baseline = calculate_baseline(recent, field)
+                    if not check_violations(current_vals, baseline, field):
+                        continue
+
+                    # Spam guard: skip if a recent SPC incident already exists
+                    if (device_id, field) in recent_spc_incidents:
+                        logger.debug(
+                            "SPC violation for %s/%s suppressed (recent incident exists)",
+                            device_id, field,
+                        )
+                        continue
+
+                    anomaly_meta = ANOMALY_TYPES.get(anomaly_type)
+                    if not anomaly_meta:
+                        continue
+
+                    _, _, title_tmpl, desc_tmpl = anomaly_meta
+                    multiplier = DEVICE_MULTIPLIERS.get(device_type, 1.0)
+                    spc_risk = min(100, int(new_risk * multiplier))
+                    spc_severity = _severity_from_score(spc_risk)
+                    spc_incident_id = str(uuid.uuid4())
+
+                    try:
+                        incidents_table.put_item(
+                            Item={
+                                "PK": f"INCIDENT#{spc_incident_id}",
+                                "incident_id": spc_incident_id,
+                                "device_id": device_id,
+                                "device_name": device_name,
+                                "severity": spc_severity,
+                                "status": "open",
+                                "title": f"[SPC] {title_tmpl}",
+                                "description": (
+                                    f"[SPC Out-of-Control] {field} = {current_vals[field]:.1f} "
+                                    f"exceeded control limit "
+                                    f"(UCL={baseline['ucl']:.1f}, LCL={baseline['lcl']:.1f}). "
+                                    f"{desc_tmpl.format(device_name=device_name)}"
+                                ),
+                                "risk_score": spc_risk,
+                                "anomaly_type": anomaly_type,
+                                "created_at": now_iso,
+                                "resolved_at": None,
+                                "source": "spc",
+                                "spc_field": field,
+                                "spc_value": str(current_vals[field]),
+                                "spc_ucl": str(baseline["ucl"]),
+                                "spc_lcl": str(baseline["lcl"]),
+                            }
+                        )
+                        incidents_created += 1
+                        # Register in local cache so subsequent fields in this
+                        # same tick for the same device don't double-fire
+                        recent_spc_incidents.add((device_id, field))
+                        logger.info(
+                            "SPC incident created: device=%s field=%s value=%.1f ucl=%.1f lcl=%.1f",
+                            device_name, field, current_vals[field],
+                            baseline["ucl"], baseline["lcl"],
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Failed to create SPC incident for device %s field %s",
+                            device_id, field,
+                        )
+        except Exception:
+            logger.exception("SPC check failed for device %s", device_id)
 
         # ── create incident on degradation ────────────────────────────────────
         if _is_degradation(old_status, new_status):

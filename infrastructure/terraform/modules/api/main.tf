@@ -83,6 +83,36 @@ resource "aws_iam_role_policy_attachment" "basic_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+# ── SNS alert topic ───────────────────────────────────────────────────────────
+
+resource "aws_sns_topic" "alerts" {
+  name = "${var.prefix}-alerts"
+  tags = var.tags
+}
+
+resource "aws_sns_topic_subscription" "email" {
+  count     = var.alert_email != "" ? 1 : 0
+  topic_arn = aws_sns_topic.alerts.arn
+  protocol  = "email"
+  endpoint  = var.alert_email
+}
+
+resource "aws_iam_role_policy" "sns_publish" {
+  name = "${var.prefix}-sns-policy"
+  role = aws_iam_role.lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["sns:Publish"]
+      Resource = [aws_sns_topic.alerts.arn]
+    }]
+  })
+}
+
+# ── DynamoDB policy ───────────────────────────────────────────────────────────
+
 resource "aws_iam_role_policy" "dynamo" {
   name = "${var.prefix}-dynamo-policy"
   role = aws_iam_role.lambda.id
@@ -137,6 +167,7 @@ resource "aws_lambda_function" "api" {
       JWT_SECRET      = var.jwt_secret
       AWS_REGION_NAME = var.aws_region
       BASE_URL        = var.base_url
+      SNS_TOPIC_ARN   = aws_sns_topic.alerts.arn
     }
   }
 

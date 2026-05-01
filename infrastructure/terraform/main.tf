@@ -76,6 +76,7 @@ module "api" {
   audit_table_arn      = module.storage.audit_table_arn
   metrics_table_name   = module.storage.metrics_table_name
   metrics_table_arn    = module.storage.metrics_table_arn
+  alert_email          = var.alert_email
 }
 
 module "frontend" {

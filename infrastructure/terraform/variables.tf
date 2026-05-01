@@ -34,3 +34,9 @@ variable "jwt_secret" {
   default     = "dev-secret-change-in-prod"
   sensitive   = true
 }
+
+variable "alert_email" {
+  description = "Email address for L1/L2 escalation alerts via SNS. Leave empty to disable."
+  type        = string
+  default     = ""
+}

@@ -20,3 +20,9 @@ variable "jwt_secret" {
   default     = "dev-secret-change-in-prod"
   sensitive   = true
 }
+
+variable "alert_email" {
+  description = "Email address for escalation alerts. Empty = disabled."
+  type        = string
+  default     = ""
+}
