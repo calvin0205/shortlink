@@ -13,6 +13,7 @@ from .routes import simulate as simulate_router
 from .routes import admin as admin_router
 from .routes import assistant as assistant_router
 from .routes import metrics as metrics_router
+from .routes import maintenance as maintenance_router
 
 app = FastAPI(
     title="OT Sentinel",
@@ -63,9 +64,10 @@ app.include_router(auth.router)
 # simulate router must be included BEFORE devices router to avoid path collision
 # (/api/devices/anomaly-types would be captured as {device_id} otherwise)
 app.include_router(simulate_router.router)
-# metrics router must be included BEFORE devices router so /{device_id}/metrics
-# is not shadowed by the /{device_id} catch-all in the devices router
+# metrics and maintenance routers must be included BEFORE devices router so
+# /metrics and /maintenance paths are not shadowed by the /{device_id} catch-all
 app.include_router(metrics_router.router)
+app.include_router(maintenance_router.router)
 app.include_router(devices.router)
 app.include_router(incidents.router)
 app.include_router(dashboard.router)

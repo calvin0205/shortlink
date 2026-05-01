@@ -48,7 +48,7 @@ function renderDevices(filter) {
   }
 
   if (filtered.length === 0) {
-    tbody.innerHTML = emptyState("🔍", `No ${filter === "all" ? "" : filter + " "}devices found`);
+    tbody.innerHTML = `<tr><td colspan="12">${emptyState("🔍", `No ${filter === "all" ? "" : filter + " "}devices found`)}</td></tr>`;
     return;
   }
 
@@ -75,6 +75,8 @@ function renderDevices(filter) {
       <td><span class="font-mono text-sm">${d.firmware_version || "—"}</span></td>
       <td class="text-secondary">${timeAgo(d.last_seen)}</td>
       <td>${riskBar(d.risk_score)}</td>
+      <td>${healthBadge(d.health_score)}</td>
+      <td>${pmDueBadge(d.pm_status, d.next_pm_date)}</td>
       <td style="white-space:nowrap">
         <button onclick="openMetricsModal('${d.device_id}', '${(d.name || "").replace(/'/g, "\\'")}')" class="btn btn-ghost" style="font-size:0.75rem;padding:4px 10px;margin-right:4px">📈 Metrics</button>
         <button onclick="openSimulateModal('${d.device_id}', '${(d.name || "").replace(/'/g, "\\'")}')" class="btn btn-danger" style="font-size:0.75rem;padding:4px 10px">⚡ Simulate</button>
@@ -82,6 +84,31 @@ function renderDevices(filter) {
     </tr>`
     )
     .join("");
+}
+
+// ── Health-score badge ────────────────────────────────────────────────────────
+
+function healthBadge(score) {
+  if (score === null || score === undefined) return '<span class="text-secondary" style="font-size:0.75rem">—</span>';
+  const n = parseInt(score, 10);
+  let cls = "health-ok";
+  if (n < 40)      cls = "health-critical";
+  else if (n < 60) cls = "health-poor";
+  else if (n < 80) cls = "health-fair";
+  return `<span class="health-badge ${cls}">${n}</span>`;
+}
+
+// ── PM-due badge ──────────────────────────────────────────────────────────────
+
+function pmDueBadge(pmStatus, nextPmDate) {
+  if (!nextPmDate) return '<span class="text-secondary" style="font-size:0.75rem">—</span>';
+  const dateStr = nextPmDate.slice(0, 10); // YYYY-MM-DD
+  const statusMap = {
+    overdue:  `<span class="pm-badge pm-overdue">⚠ Overdue (${dateStr})</span>`,
+    due_soon: `<span class="pm-badge pm-due-soon">⏰ Due ${dateStr}</span>`,
+    ok:       `<span class="pm-badge pm-ok">✓ ${dateStr}</span>`,
+  };
+  return statusMap[pmStatus] || `<span class="text-secondary" style="font-size:0.75rem">${dateStr}</span>`;
 }
 
 // ── Simulate Anomaly Modal ─────────────────────────────────────────────────────

@@ -19,6 +19,40 @@ from datetime import datetime, timedelta, timezone
 import bcrypt
 import boto3
 
+# Inline health-score helpers (avoids importing the app package from the scripts dir)
+def _pm_status(next_pm_date: str, now: datetime) -> str:
+    from datetime import timezone as tz
+    try:
+        nxt = datetime.fromisoformat(next_pm_date)
+        if nxt.tzinfo is None:
+            nxt = nxt.replace(tzinfo=tz.utc)
+        delta = (nxt - now).days
+        if delta < 0:
+            return "overdue"
+        if delta <= 7:
+            return "due_soon"
+        return "ok"
+    except Exception:
+        return "ok"
+
+def _health_score(risk_score: int, status: str, pm_status: str, next_pm_date: str, now: datetime) -> int:
+    from datetime import timezone as tz
+    score = 100.0
+    score -= min(30.0, float(risk_score) * 0.3)
+    score -= {"online": 0, "warning": 15, "critical": 30, "offline": 50}.get(status, 0)
+    if pm_status == "due_soon":
+        score -= 5.0
+    elif pm_status == "overdue" and next_pm_date:
+        try:
+            nxt = datetime.fromisoformat(next_pm_date)
+            if nxt.tzinfo is None:
+                nxt = nxt.replace(tzinfo=tz.utc)
+            days_over = max(0, (now - nxt).days)
+            score -= min(25.0, 5.0 + days_over * 2.0)
+        except Exception:
+            score -= 10.0
+    return max(0, min(100, round(score)))
+
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 ENDPOINT = os.environ.get("DYNAMODB_ENDPOINT_URL")
@@ -256,37 +290,64 @@ def seed_devices(resource):
     now = datetime.now(timezone.utc)
 
     # Fab 18 — Tainan  /  single-fab bay-level layout
+    # PM fields: last_pm_days_ago, pm_interval_days, initial_op_hours
+    # Today = 2026-05-01 (session date); PM states deliberately varied:
+    #   OVERDUE : EUV-Scanner-01, CVD-Chamber-A, Dry-Etch-02, N2-Gas-Supply
+    #   DUE_SOON: ArF-Immersion-01, ALD-System-01, Dry-Etch-01, Chiller-Main
+    #   OK      : PECVD-Chamber-B, UPW-System-01
     devices_data = [
         # Bay 1 — Lithography Bay
         {"name": "EUV-Scanner-01",   "type": "PLC",     "bay_id": "bay1",   "bay_name": "Lithography Bay",
-         "status": "online",   "ip": "10.1.1.11", "firmware": "EUV-FW-4.2.1",  "risk_score": 72, "last_seen_offset_minutes": 1},
+         "status": "online",   "ip": "10.1.1.11", "firmware": "EUV-FW-4.2.1",   "risk_score": 72, "last_seen_offset_minutes": 1,
+         "pm_interval_days": 30,  "last_pm_days_ago": 35, "initial_op_hours": 2520.0},
         {"name": "ArF-Immersion-01", "type": "PLC",     "bay_id": "bay1",   "bay_name": "Lithography Bay",
-         "status": "online",   "ip": "10.1.1.12", "firmware": "ArF-FW-3.8.0",  "risk_score": 65, "last_seen_offset_minutes": 2},
+         "status": "online",   "ip": "10.1.1.12", "firmware": "ArF-FW-3.8.0",   "risk_score": 65, "last_seen_offset_minutes": 2,
+         "pm_interval_days": 30,  "last_pm_days_ago": 27, "initial_op_hours": 1620.0},
         # Bay 2 — Thin Film Bay
         {"name": "CVD-Chamber-A",    "type": "PLC",     "bay_id": "bay2",   "bay_name": "Thin Film Bay",
-         "status": "warning",  "ip": "10.2.1.11", "firmware": "CVD-FW-2.5.3",  "risk_score": 61, "last_seen_offset_minutes": 10},
+         "status": "warning",  "ip": "10.2.1.11", "firmware": "CVD-FW-2.5.3",   "risk_score": 61, "last_seen_offset_minutes": 10,
+         "pm_interval_days": 60,  "last_pm_days_ago": 66, "initial_op_hours": 3960.0},
         {"name": "ALD-System-01",    "type": "RTU",     "bay_id": "bay2",   "bay_name": "Thin Film Bay",
-         "status": "online",   "ip": "10.2.1.12", "firmware": "ALD-FW-1.9.7",  "risk_score": 45, "last_seen_offset_minutes": 3},
+         "status": "online",   "ip": "10.2.1.12", "firmware": "ALD-FW-1.9.7",   "risk_score": 45, "last_seen_offset_minutes": 3,
+         "pm_interval_days": 60,  "last_pm_days_ago": 60, "initial_op_hours": 3600.0},
         {"name": "PECVD-Chamber-B",  "type": "PLC",     "bay_id": "bay2",   "bay_name": "Thin Film Bay",
-         "status": "online",   "ip": "10.2.1.13", "firmware": "PECVD-FW-2.1.0","risk_score": 38, "last_seen_offset_minutes": 4},
+         "status": "online",   "ip": "10.2.1.13", "firmware": "PECVD-FW-2.1.0", "risk_score": 38, "last_seen_offset_minutes": 4,
+         "pm_interval_days": 60,  "last_pm_days_ago": 40, "initial_op_hours": 2400.0},
         # Bay 3 — Etch Bay
         {"name": "Dry-Etch-01",      "type": "RTU",     "bay_id": "bay3",   "bay_name": "Etch Bay",
-         "status": "online",   "ip": "10.3.1.11", "firmware": "ETCH-FW-3.3.2", "risk_score": 42, "last_seen_offset_minutes": 2},
+         "status": "online",   "ip": "10.3.1.11", "firmware": "ETCH-FW-3.3.2",  "risk_score": 42, "last_seen_offset_minutes": 2,
+         "pm_interval_days": 45,  "last_pm_days_ago": 43, "initial_op_hours": 2580.0},
         {"name": "Dry-Etch-02",      "type": "RTU",     "bay_id": "bay3",   "bay_name": "Etch Bay",
-         "status": "critical", "ip": "10.3.1.12", "firmware": "ETCH-FW-3.3.2", "risk_score": 88, "last_seen_offset_minutes": 30},
+         "status": "critical", "ip": "10.3.1.12", "firmware": "ETCH-FW-3.3.2",  "risk_score": 88, "last_seen_offset_minutes": 30,
+         "pm_interval_days": 45,  "last_pm_days_ago": 52, "initial_op_hours": 3120.0},
         # Sub-Fab Utilities
         {"name": "Chiller-Main",     "type": "Gateway", "bay_id": "subfab", "bay_name": "Sub-Fab Utilities",
-         "status": "online",   "ip": "10.0.1.11", "firmware": "CHILL-FW-1.4.0","risk_score": 30, "last_seen_offset_minutes": 1},
+         "status": "online",   "ip": "10.0.1.11", "firmware": "CHILL-FW-1.4.0", "risk_score": 30, "last_seen_offset_minutes": 1,
+         "pm_interval_days": 90,  "last_pm_days_ago": 85, "initial_op_hours": 5100.0},
         {"name": "UPW-System-01",    "type": "Gateway", "bay_id": "subfab", "bay_name": "Sub-Fab Utilities",
-         "status": "online",   "ip": "10.0.1.12", "firmware": "UPW-FW-2.0.1",  "risk_score": 28, "last_seen_offset_minutes": 1},
+         "status": "online",   "ip": "10.0.1.12", "firmware": "UPW-FW-2.0.1",   "risk_score": 28, "last_seen_offset_minutes": 1,
+         "pm_interval_days": 90,  "last_pm_days_ago": 69, "initial_op_hours": 4140.0},
         {"name": "N2-Gas-Supply",    "type": "Sensor",  "bay_id": "subfab", "bay_name": "Sub-Fab Utilities",
-         "status": "warning",  "ip": "10.0.1.13", "firmware": "GAS-FW-1.1.5",  "risk_score": 55, "last_seen_offset_minutes": 20},
+         "status": "warning",  "ip": "10.0.1.13", "firmware": "GAS-FW-1.1.5",   "risk_score": 55, "last_seen_offset_minutes": 20,
+         "pm_interval_days": 90,  "last_pm_days_ago": 98, "initial_op_hours": 5880.0},
     ]
 
     created_devices = []
     for d in devices_data:
         device_id = str(uuid.uuid4())
         last_seen = (now - timedelta(minutes=d["last_seen_offset_minutes"])).isoformat()
+
+        # Compute PM dates
+        last_pm_date = (now - timedelta(days=d["last_pm_days_ago"])).date().isoformat()
+        next_pm_date = (
+            datetime.fromisoformat(last_pm_date).replace(tzinfo=timezone.utc)
+            + timedelta(days=d["pm_interval_days"])
+        ).date().isoformat()
+
+        # Compute derived PM status and health score
+        pm_st = _pm_status(next_pm_date, now)
+        hs    = _health_score(d["risk_score"], d["status"], pm_st, next_pm_date, now)
+
         item = {
             "PK": f"DEVICE#{device_id}",
             "device_id": device_id,
@@ -301,10 +362,17 @@ def seed_devices(resource):
             "firmware_version": d["firmware"],
             "last_seen": last_seen,
             "risk_score": d["risk_score"],
+            # PM fields
+            "pm_interval_days": d["pm_interval_days"],
+            "last_pm_date": last_pm_date,
+            "next_pm_date": next_pm_date,
+            "operating_hours": str(d["initial_op_hours"]),
+            "pm_status": pm_st,
+            "health_score": hs,
         }
         table.put_item(Item=item)
         created_devices.append(item)
-        print(f"  Created device: {d['name']} ({d['type']}, {d['status']}, {d['bay_id']})")
+        print(f"  Created device: {d['name']} ({d['type']}, {d['status']}, {d['bay_id']}, health={hs}, pm={pm_st})")
 
     return created_devices
 

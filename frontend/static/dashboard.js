@@ -14,10 +14,14 @@ let severityChart = null;
 
 async function loadDashboard() {
   try {
-    const summary = await apiFetch("/api/dashboard/summary");
+    const [summary, maintenance] = await Promise.all([
+      apiFetch("/api/dashboard/summary"),
+      apiFetch("/api/devices/maintenance").catch(() => []),
+    ]);
     renderStats(summary);
     renderRecentIncidents(summary.recent_incidents || []);
     renderCharts(summary);
+    renderMaintenance(maintenance);
   } catch (err) {
     if (err.status !== 401) {
       showToast("Failed to load dashboard data: " + err.message, "error");
@@ -55,6 +59,57 @@ function renderBays(bays) {
       </div>
     </div>
   `).join('');
+}
+
+// ── Maintenance section ───────────────────────────────────────────────────────
+
+function renderMaintenance(devices) {
+  const grid   = document.getElementById("maintenance-grid");
+  const badge  = document.getElementById("maint-badge");
+  if (!grid) return;
+
+  if (!devices || devices.length === 0) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;padding:20px"><div class="empty-state-icon">✅</div>All devices are healthy</div>';
+    return;
+  }
+
+  // Count overdue / due_soon
+  const overdueCnt  = devices.filter(d => d.pm_status === "overdue").length;
+  const dueSoonCnt  = devices.filter(d => d.pm_status === "due_soon").length;
+  if (badge) {
+    const parts = [];
+    if (overdueCnt)  parts.push(`${overdueCnt} overdue`);
+    if (dueSoonCnt)  parts.push(`${dueSoonCnt} due soon`);
+    if (parts.length) {
+      badge.textContent = parts.join(" · ");
+      badge.className   = "maint-badge" + (overdueCnt > 0 ? " maint-badge-alert" : " maint-badge-warn");
+      badge.style.display = "inline-block";
+    }
+  }
+
+  // Show worst 6 (sorted by health asc — already sorted by API)
+  const shown = devices.slice(0, 6);
+  grid.innerHTML = shown.map(d => {
+    const pmCls  = { overdue: "pm-overdue", due_soon: "pm-due-soon", ok: "pm-ok" }[d.pm_status] || "";
+    const pmIcon = { overdue: "⚠", due_soon: "⏰", ok: "✓" }[d.pm_status] || "–";
+    const pmDate = d.next_pm_date ? d.next_pm_date.slice(0, 10) : "—";
+    const hsCls  = d.health_score < 40 ? "health-critical"
+                 : d.health_score < 60 ? "health-poor"
+                 : d.health_score < 80 ? "health-fair"
+                 :                       "health-ok";
+    return `
+      <div class="maint-card">
+        <div class="maint-card-top">
+          <span class="maint-device-name">${d.name}</span>
+          <span class="health-badge ${hsCls}">${d.health_score}</span>
+        </div>
+        <div class="maint-card-meta">${d.bay_name || d.site_name}</div>
+        <div class="maint-card-pm">
+          <span class="pm-badge ${pmCls}">${pmIcon} ${pmDate}</span>
+          <span class="maint-card-hours" title="Operating hours since last PM">${parseFloat(d.operating_hours).toFixed(0)} h</span>
+        </div>
+      </div>`;
+  }).join("");
 }
 
 function renderRecentIncidents(incidents) {
@@ -260,10 +315,14 @@ let _pollTimer = null;
 
 async function refreshDashboard() {
   try {
-    const summary = await apiFetch("/api/dashboard/summary");
+    const [summary, maintenance] = await Promise.all([
+      apiFetch("/api/dashboard/summary"),
+      apiFetch("/api/devices/maintenance").catch(() => []),
+    ]);
     renderStats(summary);
     renderRecentIncidents(summary.recent_incidents || []);
     updateChartsInPlace(summary);
+    renderMaintenance(maintenance);
     setLastUpdatedNow();
   } catch (err) {
     if (err.status !== 401) {

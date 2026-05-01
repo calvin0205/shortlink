@@ -21,6 +21,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from .config import settings
+from .health_score import compute_health_score, compute_pm_status
 from .risk_engine import ANOMALY_TYPES, DEVICE_MULTIPLIERS
 from .spc import calculate_baseline, check_violations
 from .storage.base import get_resource
@@ -201,10 +202,40 @@ def run_heartbeat() -> dict:
             if roll < 0.05:
                 new_status = "online"           # device comes back
 
+        # ── PM status and health score recalculation ──────────────────────────
+        next_pm_date: str | None = device.get("next_pm_date")
+        new_pm_status = compute_pm_status(next_pm_date, now_dt)
+        new_health_score = compute_health_score(
+            risk_score=new_risk,
+            status=new_status,
+            pm_status=new_pm_status,
+            next_pm_date=next_pm_date,
+            now=now_dt,
+        )
+        # Each heartbeat tick = 5 minutes = 5/60 operating hours (non-offline only)
+        _tick_hours: float = 5.0 / 60.0
+        current_op_hours: float = float(device.get("operating_hours", 0))
+        new_op_hours: float = round(current_op_hours + _tick_hours, 3) if new_status != "offline" else current_op_hours
+
         # ── build UpdateExpression (alias all names to avoid reserved words) ──
-        update_parts = ["#rs = :risk_score"]
-        expr_names: dict[str, str] = {"#rs": "risk_score"}
-        expr_values: dict[str, Any] = {":risk_score": new_risk}
+        update_parts = [
+            "#rs = :risk_score",
+            "#hs = :health_score",
+            "#pst = :pm_status",
+            "#oh = :operating_hours",
+        ]
+        expr_names: dict[str, str] = {
+            "#rs":  "risk_score",
+            "#hs":  "health_score",
+            "#pst": "pm_status",
+            "#oh":  "operating_hours",
+        }
+        expr_values: dict[str, Any] = {
+            ":risk_score":      new_risk,
+            ":health_score":    new_health_score,
+            ":pm_status":       new_pm_status,
+            ":operating_hours": str(round(new_op_hours, 3)),  # store as String to avoid Decimal issues
+        }
 
         if old_status != "offline":
             update_parts.append("#ls = :last_seen")
